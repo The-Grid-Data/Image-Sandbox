@@ -720,6 +720,102 @@ body {
   color: var(--text-secondary);
 }
 
+/* Brush touchup toolbar */
+.brush-toolbar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  flex-wrap: wrap;
+}
+
+.brush-toolbar.active { display: flex; }
+
+.brush-toolbar .toolbar-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+
+.btn-brush {
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.btn-brush:hover { border-color: var(--text-muted); }
+
+.btn-brush.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.btn-brush.restore.active {
+  border-color: var(--success);
+  color: var(--success);
+  background: rgba(34, 197, 94, 0.15);
+}
+
+.btn-brush.erase.active {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.brush-size-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.brush-size-wrap input[type="range"] {
+  width: 80px;
+  accent-color: var(--accent);
+  height: 4px;
+}
+
+.brush-size-value {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  min-width: 24px;
+}
+
+/* Brush cursor on the comparison area */
+.comparison.brush-mode {
+  cursor: none;
+}
+
+.brush-cursor {
+  display: none;
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  pointer-events: none;
+  z-index: 15;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+
+.comparison.brush-mode .brush-cursor { display: block; }
+
+/* Edge protection slider in bg removal options */
+.edge-protect-info {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
 /* Responsive */
 @media (max-width: 600px) {
   .container { padding: 16px 12px; }
@@ -814,6 +910,12 @@ body {
           <input type="range" id="bgThresholdSlider" min="5" max="80" value="20">
           <span class="slider-value" id="bgThresholdValue">20</span>
         </div>
+        <div class="slider-row">
+          <label>Edge protection:</label>
+          <input type="range" id="edgeProtectSlider" min="0" max="8" value="2">
+          <span class="slider-value" id="edgeProtectValue">2</span>
+        </div>
+        <div class="edge-protect-info">Pulls removal boundary away from logo edges</div>
       </div>
 
       <!-- Upscale -->
@@ -841,6 +943,18 @@ body {
         <button class="btn-bg" data-bg="dark">Dark</button>
         <button class="btn-bg" data-bg="light">Light</button>
       </div>
+      <!-- Brush touchup toolbar (visible when bg removal is on) -->
+      <div class="brush-toolbar" id="brushToolbar">
+        <span class="toolbar-label">Touchup:</span>
+        <button class="btn-brush restore" id="btnBrushRestore" title="Paint to restore removed areas">Restore</button>
+        <button class="btn-brush erase" id="btnBrushErase" title="Paint to erase more background">Erase</button>
+        <button class="btn-brush" id="btnBrushOff" title="Return to comparison slider">Off</button>
+        <div class="brush-size-wrap">
+          <span class="toolbar-label">Size:</span>
+          <input type="range" id="brushSizeSlider" min="5" max="80" value="20">
+          <span class="brush-size-value" id="brushSizeValue">20</span>
+        </div>
+      </div>
       <div class="comparison" id="comparison">
         <div class="comparison-bg-checker" id="comparisonBg"></div>
         <div class="comparison-sizer" id="comparisonSizer"></div>
@@ -849,6 +963,7 @@ body {
         <div class="comparison-handle" id="comparisonHandle" style="left: 50%;"></div>
         <span class="comparison-label comparison-label-before">Before</span>
         <span class="comparison-label comparison-label-after">After</span>
+        <div class="brush-cursor" id="brushCursor"></div>
         <div class="progress-overlay" id="progressOverlay">
           <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill"></div></div>
           <div class="progress-text" id="progressText">Processing...</div>
@@ -892,6 +1007,7 @@ body {
     bgRemoval: false,
     bgRemovalColor: '#ffffff',
     bgThreshold: 20,
+    edgeProtect: 2,
     upscale: false,
     upscaleScale: 2,
     presetMode: null,   // 'white' | 'black' | 'custom' | null
@@ -900,6 +1016,9 @@ body {
     imgWidth: 0,
     imgHeight: 0,
     processing: false,
+    brushMode: null,    // null | 'restore' | 'erase'
+    brushSize: 20,
+    brushMask: null,    // Float32Array manual overrides (persists across reprocessing)
   };
 
   // ── DOM refs ──
@@ -937,6 +1056,15 @@ body {
   const originalLayer = $('originalLayer');
   const processedLayer = $('processedLayer');
   const comparisonHandle = $('comparisonHandle');
+  const edgeProtectSlider = $('edgeProtectSlider');
+  const edgeProtectValue = $('edgeProtectValue');
+  const brushToolbar = $('brushToolbar');
+  const btnBrushRestore = $('btnBrushRestore');
+  const btnBrushErase = $('btnBrushErase');
+  const btnBrushOff = $('btnBrushOff');
+  const brushSizeSlider = $('brushSizeSlider');
+  const brushSizeValueEl = $('brushSizeValue');
+  const brushCursor = $('brushCursor');
   const btnDownload = $('btnDownload');
   const downloadInfo = $('downloadInfo');
   const progressOverlay = $('progressOverlay');
@@ -1005,8 +1133,13 @@ body {
     state.bgRemovalColor = '#ffffff';
     state.upscale = false;
     state.upscaleScale = 2;
+    state.edgeProtect = 2;
+    state.brushMode = null;
+    state.brushMask = null;
     upscaleToggle.checked = false;
     upscaleOptions.classList.remove('active');
+    brushToolbar.classList.remove('active');
+    comparison.classList.remove('brush-mode');
     clearPresetButtons();
   }
 
@@ -1374,9 +1507,14 @@ body {
   bgRemovalToggle.addEventListener('change', () => {
     state.bgRemoval = bgRemovalToggle.checked;
     bgRemovalOptions.classList.toggle('active', state.bgRemoval);
+    brushToolbar.classList.toggle('active', state.bgRemoval && state.fileType === 'raster');
     // Auto-detect bg color on first enable
     if (state.bgRemoval && state.fileType === 'raster' && state.originalData) {
       autoDetectBgColor();
+    }
+    if (!state.bgRemoval) {
+      setBrushMode(null);
+      state.brushMask = null;
     }
     applyProcessing();
   });
@@ -1384,6 +1522,7 @@ body {
   bgRemovalColorInput.addEventListener('input', () => {
     state.bgRemovalColor = bgRemovalColorInput.value;
     bgRemovalHexInput.value = bgRemovalColorInput.value;
+    state.brushMask = null;
     applyProcessing();
   });
 
@@ -1393,6 +1532,7 @@ body {
     if (/^#[0-9a-fA-F]{6}$/.test(val)) {
       state.bgRemovalColor = val.toLowerCase();
       bgRemovalColorInput.value = val;
+      state.brushMask = null;
       applyProcessing();
     }
   });
@@ -1446,8 +1586,231 @@ body {
   bgThresholdSlider.addEventListener('input', () => {
     state.bgThreshold = +bgThresholdSlider.value;
     bgThresholdValue.textContent = bgThresholdSlider.value;
+    state.brushMask = null; // reset manual overrides when threshold changes
     applyProcessing();
   });
+
+  edgeProtectSlider.addEventListener('input', () => {
+    state.edgeProtect = +edgeProtectSlider.value;
+    edgeProtectValue.textContent = edgeProtectSlider.value;
+    state.brushMask = null;
+    applyProcessing();
+  });
+
+  // ── Brush Touchup ──
+  function setBrushMode(mode) {
+    state.brushMode = mode;
+    btnBrushRestore.classList.toggle('active', mode === 'restore');
+    btnBrushErase.classList.toggle('active', mode === 'erase');
+    btnBrushOff.classList.toggle('active', mode === null);
+    comparison.classList.toggle('brush-mode', mode !== null);
+    if (mode !== null) {
+      // In brush mode: show only processed layer full-width, hide slider
+      originalLayer.style.clipPath = 'inset(0 100% 0 0)';
+      processedLayer.style.clipPath = 'inset(0)';
+      comparisonHandle.style.display = 'none';
+    } else {
+      // Restore comparison slider
+      const pct = state.sliderPos;
+      originalLayer.style.clipPath = `inset(0 ${100 - pct}% 0 0)`;
+      processedLayer.style.clipPath = `inset(0 0 0 ${pct}%)`;
+      comparisonHandle.style.display = '';
+    }
+    updateBrushCursor();
+  }
+
+  btnBrushRestore.addEventListener('click', () => setBrushMode(state.brushMode === 'restore' ? null : 'restore'));
+  btnBrushErase.addEventListener('click', () => setBrushMode(state.brushMode === 'erase' ? null : 'erase'));
+  btnBrushOff.addEventListener('click', () => setBrushMode(null));
+
+  brushSizeSlider.addEventListener('input', () => {
+    state.brushSize = +brushSizeSlider.value;
+    brushSizeValueEl.textContent = brushSizeSlider.value;
+    updateBrushCursor();
+  });
+
+  function updateBrushCursor() {
+    const size = state.brushSize;
+    brushCursor.style.width = size + 'px';
+    brushCursor.style.height = size + 'px';
+    if (state.brushMode === 'restore') {
+      brushCursor.style.borderColor = 'rgba(34, 197, 94, 0.8)';
+    } else if (state.brushMode === 'erase') {
+      brushCursor.style.borderColor = 'rgba(239, 68, 68, 0.8)';
+    }
+  }
+
+  // Track brush cursor position
+  comparison.addEventListener('mousemove', e => {
+    if (!state.brushMode) return;
+    const rect = comparison.getBoundingClientRect();
+    brushCursor.style.left = (e.clientX - rect.left) + 'px';
+    brushCursor.style.top = (e.clientY - rect.top) + 'px';
+  });
+
+  comparison.addEventListener('mouseleave', () => {
+    brushCursor.style.display = 'none';
+  });
+
+  comparison.addEventListener('mouseenter', () => {
+    if (state.brushMode) brushCursor.style.display = 'block';
+  });
+
+  // Brush painting
+  let brushPainting = false;
+
+  function paintBrush(clientX, clientY) {
+    if (!state.brushMode || !state.processedCanvas) return;
+
+    const processedEl = processedLayer.querySelector('canvas');
+    if (!processedEl) return;
+
+    // Map screen coordinates to canvas pixel coordinates
+    const rect = processedEl.getBoundingClientRect();
+    const scaleX = state.processedCanvas.width / rect.width;
+    const scaleY = state.processedCanvas.height / rect.height;
+    const cx = (clientX - rect.left) * scaleX;
+    const cy = (clientY - rect.top) * scaleY;
+
+    const w = state.processedCanvas.width;
+    const h = state.processedCanvas.height;
+    const radius = (state.brushSize / 2) * scaleX;
+
+    // Initialize brush mask if needed (same size as processed canvas)
+    if (!state.brushMask) {
+      state.brushMask = new Float32Array(w * h);
+      // 0 = no override, positive = restore, negative = erase
+    }
+
+    const isRestore = state.brushMode === 'restore';
+
+    // Paint into brush mask
+    const x0 = Math.max(0, Math.floor(cx - radius));
+    const x1 = Math.min(w - 1, Math.ceil(cx + radius));
+    const y0 = Math.max(0, Math.floor(cy - radius));
+    const y1 = Math.min(h - 1, Math.ceil(cy + radius));
+
+    for (let py = y0; py <= y1; py++) {
+      for (let px = x0; px <= x1; px++) {
+        const dx = px - cx;
+        const dy = py - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > radius) continue;
+        // Soft brush: stronger in center
+        const strength = 1 - (dist / radius);
+        const idx = py * w + px;
+        if (isRestore) {
+          state.brushMask[idx] = Math.min(1, state.brushMask[idx] + strength * 0.3);
+        } else {
+          state.brushMask[idx] = Math.max(-1, state.brushMask[idx] - strength * 0.3);
+        }
+      }
+    }
+
+    // Re-render the processed layer with brush overrides applied
+    applyBrushToProcessed();
+  }
+
+  function applyBrushToProcessed() {
+    if (!state.originalData || !state.processedCanvas) return;
+
+    const src = state.originalData;
+    const w = src.width;
+    const h = src.height;
+    const srcData = src.data;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = state.processedCanvas.width;
+    canvas.height = state.processedCanvas.height;
+    const ctx = canvas.getContext('2d');
+    // Start from the current auto-processed result
+    ctx.drawImage(state.processedCanvas, 0, 0);
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imgData.data;
+
+    const bw = canvas.width;
+    const bh = canvas.height;
+    const mask = state.brushMask;
+    if (!mask) return;
+
+    // Scale factor if upscaled
+    const sx = w / bw;
+    const sy = h / bh;
+
+    for (let p = 0; p < bw * bh; p++) {
+      const val = mask[p];
+      if (val === 0) continue;
+      const i = p * 4;
+
+      if (val > 0) {
+        // Restore: blend back toward original
+        const origX = Math.min(w - 1, Math.floor((p % bw) * sx));
+        const origY = Math.min(h - 1, Math.floor(Math.floor(p / bw) * sy));
+        const oi = (origY * w + origX) * 4;
+        const factor = Math.min(1, Math.abs(val));
+        data[i]     = Math.round(data[i]     + (srcData[oi]     - data[i]) * factor);
+        data[i + 1] = Math.round(data[i + 1] + (srcData[oi + 1] - data[i + 1]) * factor);
+        data[i + 2] = Math.round(data[i + 2] + (srcData[oi + 2] - data[i + 2]) * factor);
+        data[i + 3] = Math.round(data[i + 3] + (srcData[oi + 3] - data[i + 3]) * factor);
+      } else {
+        // Erase: push toward transparent
+        const factor = Math.min(1, Math.abs(val));
+        data[i + 3] = Math.round(data[i + 3] * (1 - factor));
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+
+    // Update the display
+    const display = document.createElement('canvas');
+    display.width = canvas.width;
+    display.height = canvas.height;
+    display.style.maxWidth = '100%';
+    display.style.maxHeight = '500px';
+    display.style.objectFit = 'contain';
+    const dctx = display.getContext('2d');
+    dctx.drawImage(canvas, 0, 0);
+    processedLayer.innerHTML = '';
+    processedLayer.appendChild(display);
+
+    // Update the download canvas too
+    state._brushedCanvas = canvas;
+  }
+
+  comparison.addEventListener('mousedown', e => {
+    if (state.brushMode) {
+      brushPainting = true;
+      paintBrush(e.clientX, e.clientY);
+      e.preventDefault();
+    }
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (brushPainting && state.brushMode) {
+      paintBrush(e.clientX, e.clientY);
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    brushPainting = false;
+  });
+
+  // Touch support for brush
+  comparison.addEventListener('touchstart', e => {
+    if (state.brushMode) {
+      brushPainting = true;
+      paintBrush(e.touches[0].clientX, e.touches[0].clientY);
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  window.addEventListener('touchmove', e => {
+    if (brushPainting && state.brushMode) {
+      paintBrush(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  }, { passive: true });
+
+  window.addEventListener('touchend', () => { brushPainting = false; });
 
   // ── Upscale ──
   upscaleToggle.addEventListener('change', () => {
@@ -1492,12 +1855,12 @@ body {
     processedLayer.style.clipPath = `inset(0 0 0 ${pct}%)`;
   }
 
-  comparison.addEventListener('mousedown', e => { dragging = true; updateSlider(e.clientX); });
-  window.addEventListener('mousemove', e => { if (dragging) updateSlider(e.clientX); });
+  comparison.addEventListener('mousedown', e => { if (!state.brushMode) { dragging = true; updateSlider(e.clientX); } });
+  window.addEventListener('mousemove', e => { if (dragging && !state.brushMode) updateSlider(e.clientX); });
   window.addEventListener('mouseup', () => { dragging = false; });
 
-  comparison.addEventListener('touchstart', e => { dragging = true; updateSlider(e.touches[0].clientX); }, { passive: true });
-  window.addEventListener('touchmove', e => { if (dragging) updateSlider(e.touches[0].clientX); }, { passive: true });
+  comparison.addEventListener('touchstart', e => { if (!state.brushMode) { dragging = true; updateSlider(e.touches[0].clientX); } }, { passive: true });
+  window.addEventListener('touchmove', e => { if (dragging && !state.brushMode) updateSlider(e.touches[0].clientX); }, { passive: true });
   window.addEventListener('touchend', () => { dragging = false; });
 
   // ── Apply Processing (dispatcher) ──
@@ -1814,6 +2177,42 @@ body {
     return mask;
   }
 
+  /**
+   * Morphological erosion on the bg mask: shrinks the removal zone inward,
+   * pulling the boundary away from logo edges. `radius` is number of pixels
+   * to erode. Works by finding boundary pixels of the bg region and setting
+   * them to keep (1.0), repeated `radius` times.
+   */
+  function erodeMask(mask, w, h, radius) {
+    if (radius <= 0) return mask;
+    const totalPixels = w * h;
+    // Work on a copy
+    const out = new Float32Array(mask);
+
+    for (let pass = 0; pass < radius; pass++) {
+      // Find boundary pixels: bg pixels (mask < 1) adjacent to a foreground pixel (mask == 1)
+      const boundary = [];
+      for (let p = 0; p < totalPixels; p++) {
+        if (out[p] >= 1.0) continue; // already foreground
+        const x = p % w;
+        const y = (p - x) / w;
+        // Check if any neighbor is foreground
+        let nearFg = false;
+        if (x > 0     && out[p - 1] >= 1.0) nearFg = true;
+        if (x < w - 1 && out[p + 1] >= 1.0) nearFg = true;
+        if (y > 0     && out[p - w] >= 1.0) nearFg = true;
+        if (y < h - 1 && out[p + w] >= 1.0) nearFg = true;
+        if (nearFg) boundary.push(p);
+      }
+      // Set boundary pixels to foreground
+      for (const p of boundary) {
+        out[p] = 1.0;
+      }
+    }
+
+    return out;
+  }
+
   function applyRasterProcessing() {
     if (!state.originalData) return;
 
@@ -1821,6 +2220,7 @@ body {
     currentRunId++;
     const thisRunId = currentRunId;
     state.processing = false;
+    state._brushedCanvas = null;
 
     const src = state.originalData;
     const w = src.width;
@@ -1861,6 +2261,11 @@ body {
     if (doBgRemoval) {
       showProgress(10, 'Detecting background...');
       bgMask = buildEdgeFloodMask(srcData, w, h, bgRgb, bgThreshold);
+      // Apply morphological erosion (edge protection)
+      if (state.edgeProtect > 0) {
+        showProgress(15, 'Protecting edges...');
+        bgMask = erodeMask(bgMask, w, h, state.edgeProtect);
+      }
     }
 
     // For large images, process in chunks
@@ -2031,17 +2436,27 @@ body {
   }
 
   function renderProcessedRaster(canvas) {
+    // Always display at original dimensions so it aligns with the original layer
+    // and sizer. The full-res upscaled canvas is kept in state for download.
+    const displayW = state.originalCanvas.width;
+    const displayH = state.originalCanvas.height;
     const display = document.createElement('canvas');
-    display.width = canvas.width;
-    display.height = canvas.height;
+    display.width = displayW;
+    display.height = displayH;
     display.style.maxWidth = '100%';
     display.style.maxHeight = '500px';
     display.style.objectFit = 'contain';
     const ctx = display.getContext('2d');
-    ctx.drawImage(canvas, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(canvas, 0, 0, displayW, displayH);
     processedLayer.innerHTML = '';
     processedLayer.appendChild(display);
     updateDownloadInfo();
+    // Re-apply brush mask if it exists
+    if (state.brushMask) {
+      applyBrushToProcessed();
+    }
   }
 
   // ── Download ──
@@ -2072,7 +2487,7 @@ body {
   }
 
   function downloadRaster() {
-    const canvas = state.processedCanvas || state.originalCanvas;
+    const canvas = state._brushedCanvas || state.processedCanvas || state.originalCanvas;
     if (!canvas) return;
     canvas.toBlob(blob => {
       const baseName = state.fileName.replace(/\.(png|jpg|jpeg|webp|avif|gif|bmp|tiff|tif|ico)$/i, '');
