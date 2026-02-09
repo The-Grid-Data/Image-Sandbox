@@ -1,0 +1,2098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logo Color Changer</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-tertiary: #0f3460;
+  --accent: #a855f7;
+  --accent-hover: #9333ea;
+  --accent-dim: rgba(168, 85, 247, 0.15);
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border: #334155;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --radius: 8px;
+  --radius-sm: 6px;
+  --transition: 0.2s ease;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 20px;
+}
+
+/* Header */
+.header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent), #c084fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 6px;
+}
+
+.header p {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* Drop Zone */
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+  background: var(--bg-secondary);
+  position: relative;
+}
+
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.drop-zone-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+  opacity: 0.6;
+}
+
+.drop-zone-text {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.drop-zone-text strong {
+  color: var(--accent);
+}
+
+.drop-zone-formats {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.drop-zone input[type="file"] {
+  display: none;
+}
+
+/* Editor - hidden until image loaded */
+.editor {
+  display: none;
+  margin-top: 24px;
+}
+
+.editor.active { display: block; }
+
+/* Panels */
+.panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
+/* File info bar */
+.file-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.file-info-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.file-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.file-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.file-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+.btn-change-file {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.btn-change-file:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+/* Presets */
+.presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.btn-preset {
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.btn-preset:hover {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.btn-preset.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Color swatches */
+.swatches-section {
+  margin-bottom: 16px;
+}
+
+.swatches-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.swatches {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition);
+  position: relative;
+}
+
+.swatch:hover {
+  transform: scale(1.15);
+}
+
+.swatch.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+.swatch-check {
+  display: none;
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+.swatch.selected .swatch-check {
+  display: flex;
+}
+
+/* Target color */
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.color-row label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.color-picker-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-picker-wrap input[type="color"] {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: none;
+  padding: 0;
+}
+
+.color-picker-wrap input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+.color-picker-wrap input[type="color"]::-webkit-color-swatch { border-radius: 4px; border: 1px solid var(--border); }
+
+.color-hex {
+  font-size: 13px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: var(--text-muted);
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  width: 80px;
+  text-align: center;
+}
+
+/* Tolerance / threshold sliders */
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.slider-row label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  min-width: 120px;
+}
+
+.slider-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+  height: 4px;
+}
+
+.slider-value {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  min-width: 32px;
+  text-align: right;
+}
+
+/* Toggle */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.toggle-row label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: var(--border);
+  border-radius: 11px;
+  transition: background var(--transition);
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 3px;
+  bottom: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: transform var(--transition);
+}
+
+.toggle input:checked + .toggle-slider {
+  background: var(--accent);
+}
+
+.toggle input:checked + .toggle-slider::before {
+  transform: translateX(18px);
+}
+
+/* Bg removal threshold - hidden until toggle on */
+.bg-removal-options {
+  display: none;
+  padding-left: 52px;
+}
+
+.bg-removal-options.active { display: block; }
+
+.btn-auto-detect {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.btn-auto-detect:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Upscale options */
+.upscale-options {
+  display: none;
+  padding-left: 52px;
+}
+
+.upscale-options.active { display: block; }
+
+.upscale-info {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+/* Preview area */
+.preview-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.preview-bg-controls {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.btn-bg {
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.btn-bg:hover { border-color: var(--text-muted); }
+
+.btn-bg.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+/* Comparison slider */
+.comparison {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius);
+  cursor: col-resize;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.comparison-bg-checker {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(45deg, #e0e0e0 25%, transparent 25%),
+    linear-gradient(-45deg, #e0e0e0 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e0e0e0 75%),
+    linear-gradient(-45deg, transparent 75%, #e0e0e0 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0px;
+  background-color: #f0f0f0;
+  z-index: 0;
+}
+
+.comparison-bg-checker.bg-dark {
+  background-image: none;
+  background-color: #1a1a2e;
+}
+
+.comparison-bg-checker.bg-light {
+  background-image: none;
+  background-color: #f8fafc;
+}
+
+/* Sizer keeps the comparison container at the correct aspect ratio */
+.comparison-sizer {
+  position: relative;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  visibility: hidden;
+}
+
+.comparison-sizer img,
+.comparison-sizer canvas,
+.comparison-sizer .svg-preview {
+  max-width: 100%;
+  max-height: 500px;
+  display: block;
+  object-fit: contain;
+}
+
+.comparison-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.comparison-layer img,
+.comparison-layer canvas,
+.comparison-layer .svg-preview {
+  max-width: 100%;
+  max-height: 500px;
+  display: block;
+  object-fit: contain;
+}
+
+.comparison-processed {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.comparison-processed img,
+.comparison-processed canvas,
+.comparison-processed .svg-preview {
+  max-width: 100%;
+  max-height: 500px;
+  display: block;
+  object-fit: contain;
+}
+
+/* The slider handle */
+.comparison-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--accent);
+  z-index: 10;
+  cursor: col-resize;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.comparison-handle::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 36px;
+  height: 36px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.comparison-handle::after {
+  content: '\2194';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #fff;
+  font-size: 18px;
+  font-weight: bold;
+  z-index: 1;
+}
+
+.comparison-label {
+  position: absolute;
+  bottom: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.comparison-label-before { left: 10px; }
+.comparison-label-after { right: 10px; }
+
+/* Download */
+.download-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.btn-download:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+}
+
+.btn-download:active {
+  transform: translateY(0);
+}
+
+.download-info {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Toast */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: #fff;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  animation: toast-in 0.3s ease;
+  max-width: 320px;
+}
+
+.toast.success { border-left: 3px solid var(--success); }
+.toast.warning { border-left: 3px solid var(--warning); }
+.toast.error { border-left: 3px solid var(--danger); }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Progress overlay */
+.progress-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(26, 26, 46, 0.85);
+  z-index: 20;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  border-radius: var(--radius);
+}
+
+.progress-overlay.active { display: flex; }
+
+.progress-bar-track {
+  width: 200px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  width: 0%;
+  transition: width 0.1s;
+}
+
+.progress-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .container { padding: 16px 12px; }
+  .header h1 { font-size: 22px; }
+  .presets { flex-direction: column; }
+  .color-row { flex-direction: column; align-items: flex-start; }
+  .slider-row { flex-direction: column; align-items: flex-start; }
+  .slider-row label { min-width: auto; }
+  .download-bar { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Logo Color Changer</h1>
+    <p>Change logo colors for light and dark backgrounds. Supports SVG, PNG, JPG, WebP, AVIF, GIF, BMP, and TIFF.</p>
+  </div>
+
+  <!-- Drop Zone -->
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-zone-icon">&#128444;</div>
+    <div class="drop-zone-text">Drag &amp; drop your logo here, or <strong>click to browse</strong></div>
+    <div class="drop-zone-formats">SVG, PNG, JPG, WebP, AVIF, GIF, BMP, TIFF</div>
+    <input type="file" id="fileInput" accept=".svg,.png,.jpg,.jpeg,.webp,.avif,.gif,.bmp,.tiff,.tif,.ico,image/svg+xml,image/png,image/jpeg,image/webp,image/avif,image/gif,image/bmp,image/tiff,image/x-icon">
+  </div>
+
+  <!-- Editor -->
+  <div class="editor" id="editor">
+    <!-- File Info -->
+    <div class="panel" id="fileInfoPanel">
+      <div class="file-info">
+        <div class="file-info-left">
+          <span class="file-name" id="fileName"></span>
+          <span class="file-badge" id="fileBadge"></span>
+          <span class="file-meta" id="fileMeta"></span>
+        </div>
+        <button class="btn-change-file" id="btnChangeFile">Change file</button>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="panel" id="controlsPanel">
+      <div class="panel-title">Quick Presets</div>
+      <div class="presets">
+        <button class="btn-preset" id="presetWhite">Make White (for dark bg)</button>
+        <button class="btn-preset" id="presetBlack">Make Black (for light bg)</button>
+        <button class="btn-preset" id="presetCustom">Custom Color</button>
+      </div>
+
+      <!-- Detected colors -->
+      <div class="swatches-section" id="swatchesSection" style="display:none;">
+        <div class="swatches-label">Detected colors &mdash; click to select source color:</div>
+        <div class="swatches" id="swatches"></div>
+      </div>
+
+      <!-- Target color -->
+      <div class="color-row" id="targetColorRow" style="display:none;">
+        <label>Replace with:</label>
+        <div class="color-picker-wrap">
+          <input type="color" id="targetColor" value="#ffffff">
+          <input type="text" class="color-hex" id="targetHex" value="#ffffff" maxlength="7">
+        </div>
+      </div>
+
+      <!-- Tolerance (raster only) -->
+      <div class="slider-row" id="toleranceRow" style="display:none;">
+        <label>Color tolerance:</label>
+        <input type="range" id="toleranceSlider" min="0" max="150" value="50">
+        <span class="slider-value" id="toleranceValue">50</span>
+      </div>
+
+      <!-- Background removal -->
+      <div class="toggle-row">
+        <label class="toggle" for="bgRemovalToggle">
+          <input type="checkbox" id="bgRemovalToggle">
+          <span class="toggle-slider"></span>
+        </label>
+        <label for="bgRemovalToggle">Remove background (edge-aware)</label>
+      </div>
+      <div class="bg-removal-options" id="bgRemovalOptions">
+        <div class="color-row">
+          <label>Background color:</label>
+          <div class="color-picker-wrap">
+            <input type="color" id="bgRemovalColor" value="#ffffff">
+            <input type="text" class="color-hex" id="bgRemovalHex" value="#ffffff" maxlength="7">
+            <button class="btn-auto-detect" id="btnAutoDetectBg" title="Auto-detect from image corners">Auto</button>
+          </div>
+        </div>
+        <div class="slider-row">
+          <label>Threshold:</label>
+          <input type="range" id="bgThresholdSlider" min="5" max="80" value="20">
+          <span class="slider-value" id="bgThresholdValue">20</span>
+        </div>
+      </div>
+
+      <!-- Upscale -->
+      <div class="toggle-row">
+        <label class="toggle" for="upscaleToggle">
+          <input type="checkbox" id="upscaleToggle">
+          <span class="toggle-slider"></span>
+        </label>
+        <label for="upscaleToggle">Enhance &amp; upscale</label>
+      </div>
+      <div class="upscale-options" id="upscaleOptions">
+        <div class="presets" style="margin-bottom:0;">
+          <button class="btn-preset btn-upscale active" data-scale="2">2x</button>
+          <button class="btn-preset btn-upscale" data-scale="4">4x</button>
+        </div>
+        <div class="upscale-info">Upscales using high-quality bicubic interpolation with sharpening</div>
+      </div>
+    </div>
+
+    <!-- Preview -->
+    <div class="panel preview-panel" id="previewPanel">
+      <div class="panel-title">Preview</div>
+      <div class="preview-bg-controls">
+        <button class="btn-bg active" data-bg="checker">Transparent</button>
+        <button class="btn-bg" data-bg="dark">Dark</button>
+        <button class="btn-bg" data-bg="light">Light</button>
+      </div>
+      <div class="comparison" id="comparison">
+        <div class="comparison-bg-checker" id="comparisonBg"></div>
+        <div class="comparison-sizer" id="comparisonSizer"></div>
+        <div class="comparison-layer" id="originalLayer" style="clip-path: inset(0 50% 0 0);"></div>
+        <div class="comparison-processed" id="processedLayer" style="clip-path: inset(0 0 0 50%);"></div>
+        <div class="comparison-handle" id="comparisonHandle" style="left: 50%;"></div>
+        <span class="comparison-label comparison-label-before">Before</span>
+        <span class="comparison-label comparison-label-after">After</span>
+        <div class="progress-overlay" id="progressOverlay">
+          <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill"></div></div>
+          <div class="progress-text" id="progressText">Processing...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Download -->
+    <div class="panel">
+      <div class="download-bar">
+        <button class="btn-download" id="btnDownload">&#11015; Download</button>
+        <span class="download-info" id="downloadInfo"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ── State ──
+  const state = {
+    file: null,
+    fileName: '',
+    fileType: '',       // 'svg' | 'raster'
+    originalFormat: '', // 'svg' | 'png' | 'webp' | 'avif'
+    svgSource: '',
+    svgDoc: null,
+    originalImg: null,
+    originalCanvas: null,
+    originalData: null,
+    processedCanvas: null,
+    detectedColors: [],
+    selectedSourceColor: null,
+    targetColor: '#ffffff',
+    tolerance: 50,
+    bgRemoval: false,
+    bgRemovalColor: '#ffffff',
+    bgThreshold: 20,
+    upscale: false,
+    upscaleScale: 2,
+    presetMode: null,   // 'white' | 'black' | 'custom' | null
+    sliderPos: 50,
+    previewBg: 'checker',
+    imgWidth: 0,
+    imgHeight: 0,
+    processing: false,
+  };
+
+  // ── DOM refs ──
+  const $ = id => document.getElementById(id);
+  const comparisonSizer = $('comparisonSizer');
+  const dropZone = $('dropZone');
+  const fileInput = $('fileInput');
+  const editor = $('editor');
+  const fileName = $('fileName');
+  const fileBadge = $('fileBadge');
+  const fileMeta = $('fileMeta');
+  const btnChangeFile = $('btnChangeFile');
+  const presetWhite = $('presetWhite');
+  const presetBlack = $('presetBlack');
+  const presetCustom = $('presetCustom');
+  const swatchesSection = $('swatchesSection');
+  const swatchesEl = $('swatches');
+  const targetColorRow = $('targetColorRow');
+  const targetColorInput = $('targetColor');
+  const targetHexInput = $('targetHex');
+  const toleranceRow = $('toleranceRow');
+  const toleranceSlider = $('toleranceSlider');
+  const toleranceValue = $('toleranceValue');
+  const bgRemovalToggle = $('bgRemovalToggle');
+  const bgRemovalOptions = $('bgRemovalOptions');
+  const bgRemovalColorInput = $('bgRemovalColor');
+  const bgRemovalHexInput = $('bgRemovalHex');
+  const btnAutoDetectBg = $('btnAutoDetectBg');
+  const bgThresholdSlider = $('bgThresholdSlider');
+  const bgThresholdValue = $('bgThresholdValue');
+  const upscaleToggle = $('upscaleToggle');
+  const upscaleOptions = $('upscaleOptions');
+  const comparison = $('comparison');
+  const comparisonBg = $('comparisonBg');
+  const originalLayer = $('originalLayer');
+  const processedLayer = $('processedLayer');
+  const comparisonHandle = $('comparisonHandle');
+  const btnDownload = $('btnDownload');
+  const downloadInfo = $('downloadInfo');
+  const progressOverlay = $('progressOverlay');
+  const progressFill = $('progressFill');
+  const progressText = $('progressText');
+  const toastContainer = $('toastContainer');
+
+  // ── Toast ──
+  function showToast(msg, type = 'success') {
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.textContent = msg;
+    toastContainer.appendChild(el);
+    setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; }, 2500);
+    setTimeout(() => el.remove(), 2800);
+  }
+
+  // ── Progress ──
+  function showProgress(pct, text) {
+    progressOverlay.classList.add('active');
+    progressFill.style.width = pct + '%';
+    if (text) progressText.textContent = text;
+  }
+
+  function hideProgress() {
+    progressOverlay.classList.remove('active');
+    progressFill.style.width = '0%';
+  }
+
+  // ── File Upload ──
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => { if (fileInput.files.length) handleFile(fileInput.files[0]); });
+  btnChangeFile.addEventListener('click', () => { resetState(); fileInput.click(); });
+
+  function resetState() {
+    state.file = null;
+    state.svgSource = '';
+    state.svgDoc = null;
+    state.originalImg = null;
+    state.originalCanvas = null;
+    state.originalData = null;
+    state.processedCanvas = null;
+    state.detectedColors = [];
+    state.selectedSourceColor = null;
+    state.presetMode = null;
+    state.processing = false;
+    editor.classList.remove('active');
+    dropZone.style.display = '';
+    originalLayer.innerHTML = '';
+    processedLayer.innerHTML = '';
+    comparisonSizer.innerHTML = '';
+    swatchesEl.innerHTML = '';
+    swatchesSection.style.display = 'none';
+    targetColorRow.style.display = 'none';
+    toleranceRow.style.display = 'none';
+    bgRemovalToggle.checked = false;
+    bgRemovalOptions.classList.remove('active');
+    state.bgRemoval = false;
+    state.bgRemovalColor = '#ffffff';
+    state.upscale = false;
+    state.upscaleScale = 2;
+    upscaleToggle.checked = false;
+    upscaleOptions.classList.remove('active');
+    clearPresetButtons();
+  }
+
+  function handleFile(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const validExts = ['svg', 'png', 'jpg', 'jpeg', 'webp', 'avif', 'gif', 'bmp', 'tiff', 'tif', 'ico'];
+    if (!validExts.includes(ext)) {
+      showToast('Unsupported format. Use SVG, PNG, JPG, WebP, AVIF, GIF, BMP, or TIFF.', 'error');
+      return;
+    }
+
+    state.file = file;
+    state.fileName = file.name;
+    state.originalFormat = ext;
+    state.fileType = ext === 'svg' ? 'svg' : 'raster';
+
+    if (ext !== 'svg' && ext !== 'png') {
+      showToast(`Will convert from ${ext.toUpperCase()} to PNG on download`, 'warning');
+    }
+
+    fileName.textContent = file.name;
+    fileBadge.textContent = ext.toUpperCase();
+
+    if (state.fileType === 'svg') {
+      loadSVG(file);
+    } else {
+      loadRaster(file);
+    }
+  }
+
+  // ── SVG Loading ──
+  function loadSVG(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      state.svgSource = e.target.result;
+      const parser = new DOMParser();
+      state.svgDoc = parser.parseFromString(state.svgSource, 'image/svg+xml');
+
+      const parseErr = state.svgDoc.querySelector('parsererror');
+      if (parseErr) {
+        showToast('Failed to parse SVG file.', 'error');
+        return;
+      }
+
+      const svgEl = state.svgDoc.documentElement;
+      const vb = svgEl.getAttribute('viewBox');
+      let w, h;
+      if (vb) {
+        const parts = vb.split(/[\s,]+/);
+        w = Math.round(parseFloat(parts[2]));
+        h = Math.round(parseFloat(parts[3]));
+      } else {
+        w = parseInt(svgEl.getAttribute('width')) || 300;
+        h = parseInt(svgEl.getAttribute('height')) || 300;
+      }
+      state.imgWidth = w;
+      state.imgHeight = h;
+      fileMeta.textContent = `${w} x ${h}`;
+
+      detectSVGColors();
+      showEditor();
+      renderOriginalSVG();
+      renderProcessedSVG();
+    };
+    reader.readAsText(file);
+  }
+
+  // ── Raster Loading ──
+  function loadRaster(file) {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      state.originalImg = img;
+      state.imgWidth = img.naturalWidth;
+      state.imgHeight = img.naturalHeight;
+      fileMeta.textContent = `${img.naturalWidth} x ${img.naturalHeight}`;
+
+      // Draw to canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      state.originalCanvas = canvas;
+      state.originalData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      detectRasterColors();
+      showEditor();
+      renderOriginalRaster();
+      applyRasterProcessing();
+      URL.revokeObjectURL(url);
+    };
+    img.onerror = () => {
+      showToast(`Browser cannot decode this ${state.originalFormat.toUpperCase()} file.`, 'error');
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  }
+
+  // ── SVG Color Detection ──
+  function detectSVGColors() {
+    const colors = new Map();
+    const svgEl = state.svgDoc.documentElement;
+
+    function walkNode(node) {
+      if (node.nodeType !== 1) return;
+      for (const attr of ['fill', 'stroke']) {
+        let val = node.getAttribute(attr);
+        if (!val && node.style && node.style[attr]) val = node.style[attr];
+        if (val && val !== 'none' && val !== 'transparent' && val !== 'inherit' && val !== 'currentColor') {
+          const hex = normalizeColor(val);
+          if (hex) colors.set(hex, (colors.get(hex) || 0) + 1);
+        }
+      }
+      // Check inline style
+      const style = node.getAttribute('style');
+      if (style) {
+        const fillMatch = style.match(/fill\s*:\s*([^;]+)/i);
+        const strokeMatch = style.match(/stroke\s*:\s*([^;]+)/i);
+        if (fillMatch) { const h = normalizeColor(fillMatch[1].trim()); if (h) colors.set(h, (colors.get(h) || 0) + 1); }
+        if (strokeMatch) { const h = normalizeColor(strokeMatch[1].trim()); if (h) colors.set(h, (colors.get(h) || 0) + 1); }
+      }
+      for (const child of node.children) walkNode(child);
+    }
+
+    // Also check <style> blocks
+    const styleEls = svgEl.querySelectorAll('style');
+    for (const sEl of styleEls) {
+      const matches = sEl.textContent.matchAll(/(fill|stroke)\s*:\s*([^;}\s]+)/gi);
+      for (const m of matches) {
+        const h = normalizeColor(m[2].trim());
+        if (h) colors.set(h, (colors.get(h) || 0) + 1);
+      }
+    }
+
+    walkNode(svgEl);
+
+    state.detectedColors = [...colors.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(e => e[0]);
+
+    renderSwatches();
+  }
+
+  // ── Raster Color Detection ──
+  function detectRasterColors() {
+    const data = state.originalData.data;
+    const w = state.originalData.width;
+    const h = state.originalData.height;
+    const colorCounts = new Map();
+
+    // Sample every Nth pixel for performance
+    const step = Math.max(1, Math.floor((w * h) / 10000));
+    for (let i = 0; i < data.length; i += step * 4) {
+      const a = data[i + 3];
+      if (a < 128) continue; // skip mostly transparent
+      // Quantize to reduce noise
+      const r = Math.round(data[i] / 16) * 16;
+      const g = Math.round(data[i + 1] / 16) * 16;
+      const b = Math.round(data[i + 2] / 16) * 16;
+      const key = rgbToHex(Math.min(r, 255), Math.min(g, 255), Math.min(b, 255));
+      colorCounts.set(key, (colorCounts.get(key) || 0) + 1);
+    }
+
+    // Cluster close colors
+    const sorted = [...colorCounts.entries()].sort((a, b) => b[1] - a[1]);
+    const clusters = [];
+    const used = new Set();
+
+    for (const [hex, count] of sorted) {
+      if (used.has(hex)) continue;
+      const rgb = hexToRgb(hex);
+      let merged = false;
+      for (const cl of clusters) {
+        const dist = colorDistance(rgb, cl.rgb);
+        if (dist < 40) {
+          cl.count += count;
+          used.add(hex);
+          merged = true;
+          break;
+        }
+      }
+      if (!merged) {
+        clusters.push({ hex, rgb, count });
+        used.add(hex);
+      }
+      if (clusters.length >= 20) break;
+    }
+
+    clusters.sort((a, b) => b.count - a.count);
+    state.detectedColors = clusters.slice(0, 12).map(c => c.hex);
+    renderSwatches();
+  }
+
+  // ── Swatch Rendering ──
+  function renderSwatches() {
+    swatchesEl.innerHTML = '';
+    if (!state.detectedColors.length) {
+      swatchesSection.style.display = 'none';
+      return;
+    }
+    swatchesSection.style.display = '';
+    for (const hex of state.detectedColors) {
+      const el = document.createElement('div');
+      el.className = 'swatch';
+      el.style.background = hex;
+      el.title = hex;
+      const lum = luminance(hexToRgb(hex));
+      const checkColor = lum > 0.5 ? '#000' : '#fff';
+      el.innerHTML = `<span class="swatch-check" style="color:${checkColor}">&#10003;</span>`;
+      el.addEventListener('click', () => selectSourceColor(hex, el));
+      swatchesEl.appendChild(el);
+    }
+  }
+
+  function selectSourceColor(hex, el) {
+    state.selectedSourceColor = hex;
+    swatchesEl.querySelectorAll('.swatch').forEach(s => s.classList.remove('selected'));
+    el.classList.add('selected');
+    targetColorRow.style.display = '';
+    if (state.fileType === 'raster') toleranceRow.style.display = '';
+    applyProcessing();
+  }
+
+  // ── Color Utilities ──
+  function normalizeColor(str) {
+    if (!str) return null;
+    str = str.trim().toLowerCase();
+    if (str === 'none' || str === 'transparent' || str === 'inherit') return null;
+
+    // Named colors - use canvas trick
+    if (!str.startsWith('#') && !str.startsWith('rgb')) {
+      const ctx = document.createElement('canvas').getContext('2d');
+      ctx.fillStyle = str;
+      str = ctx.fillStyle; // returns hex
+    }
+
+    if (str.startsWith('#')) {
+      if (str.length === 4) str = '#' + str[1]+str[1] + str[2]+str[2] + str[3]+str[3];
+      return str.toLowerCase();
+    }
+
+    const m = str.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+    if (m) return rgbToHex(+m[1], +m[2], +m[3]);
+    return null;
+  }
+
+  function rgbToHex(r, g, b) {
+    return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+  }
+
+  function hexToRgb(hex) {
+    hex = hex.replace('#', '');
+    if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+    return { r: parseInt(hex.slice(0,2), 16), g: parseInt(hex.slice(2,4), 16), b: parseInt(hex.slice(4,6), 16) };
+  }
+
+  function colorDistance(a, b) {
+    return Math.sqrt((a.r-b.r)**2 + (a.g-b.g)**2 + (a.b-b.b)**2);
+  }
+
+  function luminance(rgb) {
+    const [rs, gs, bs] = [rgb.r, rgb.g, rgb.b].map(v => {
+      v /= 255;
+      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+  }
+
+  // ── Show Editor ──
+  function showEditor() {
+    dropZone.style.display = 'none';
+    editor.classList.add('active');
+    updateDownloadInfo();
+  }
+
+  // ── Presets ──
+  function clearPresetButtons() {
+    [presetWhite, presetBlack, presetCustom].forEach(b => b.classList.remove('active'));
+  }
+
+  presetWhite.addEventListener('click', () => {
+    clearPresetButtons();
+    presetWhite.classList.add('active');
+    state.presetMode = 'white';
+    state.targetColor = '#ffffff';
+    targetColorInput.value = '#ffffff';
+    targetHexInput.value = '#ffffff';
+    targetColorRow.style.display = '';
+    if (state.fileType === 'raster') toleranceRow.style.display = '';
+
+    // Auto-select darkest color as source
+    if (state.detectedColors.length) {
+      swatchesSection.style.display = '';
+      const darkest = [...state.detectedColors].sort((a, b) => luminance(hexToRgb(a)) - luminance(hexToRgb(b)))[0];
+      state.selectedSourceColor = darkest;
+      highlightSwatch(darkest);
+    }
+    applyProcessing();
+  });
+
+  presetBlack.addEventListener('click', () => {
+    clearPresetButtons();
+    presetBlack.classList.add('active');
+    state.presetMode = 'black';
+    state.targetColor = '#000000';
+    targetColorInput.value = '#000000';
+    targetHexInput.value = '#000000';
+    targetColorRow.style.display = '';
+    if (state.fileType === 'raster') toleranceRow.style.display = '';
+
+    // Auto-select lightest non-white color as source
+    if (state.detectedColors.length) {
+      swatchesSection.style.display = '';
+      const lightest = [...state.detectedColors]
+        .filter(c => colorDistance(hexToRgb(c), {r:255,g:255,b:255}) > 30)
+        .sort((a, b) => luminance(hexToRgb(b)) - luminance(hexToRgb(a)))[0]
+        || state.detectedColors[0];
+      state.selectedSourceColor = lightest;
+      highlightSwatch(lightest);
+    }
+    applyProcessing();
+  });
+
+  presetCustom.addEventListener('click', () => {
+    clearPresetButtons();
+    presetCustom.classList.add('active');
+    state.presetMode = 'custom';
+    targetColorRow.style.display = '';
+    if (state.fileType === 'raster') toleranceRow.style.display = '';
+    swatchesSection.style.display = state.detectedColors.length ? '' : 'none';
+  });
+
+  function highlightSwatch(hex) {
+    swatchesEl.querySelectorAll('.swatch').forEach(s => {
+      s.classList.toggle('selected', s.title === hex);
+    });
+  }
+
+  // ── Target Color ──
+  targetColorInput.addEventListener('input', () => {
+    state.targetColor = targetColorInput.value;
+    targetHexInput.value = targetColorInput.value;
+    applyProcessing();
+  });
+
+  targetHexInput.addEventListener('change', () => {
+    let val = targetHexInput.value.trim();
+    if (!val.startsWith('#')) val = '#' + val;
+    if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+      state.targetColor = val.toLowerCase();
+      targetColorInput.value = val;
+      applyProcessing();
+    }
+  });
+
+  // ── Tolerance ──
+  toleranceSlider.addEventListener('input', () => {
+    state.tolerance = +toleranceSlider.value;
+    toleranceValue.textContent = toleranceSlider.value;
+    applyProcessing();
+  });
+
+  // ── Background Removal ──
+  bgRemovalToggle.addEventListener('change', () => {
+    state.bgRemoval = bgRemovalToggle.checked;
+    bgRemovalOptions.classList.toggle('active', state.bgRemoval);
+    // Auto-detect bg color on first enable
+    if (state.bgRemoval && state.fileType === 'raster' && state.originalData) {
+      autoDetectBgColor();
+    }
+    applyProcessing();
+  });
+
+  bgRemovalColorInput.addEventListener('input', () => {
+    state.bgRemovalColor = bgRemovalColorInput.value;
+    bgRemovalHexInput.value = bgRemovalColorInput.value;
+    applyProcessing();
+  });
+
+  bgRemovalHexInput.addEventListener('change', () => {
+    let val = bgRemovalHexInput.value.trim();
+    if (!val.startsWith('#')) val = '#' + val;
+    if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+      state.bgRemovalColor = val.toLowerCase();
+      bgRemovalColorInput.value = val;
+      applyProcessing();
+    }
+  });
+
+  btnAutoDetectBg.addEventListener('click', () => {
+    if (state.fileType === 'raster' && state.originalData) {
+      autoDetectBgColor();
+      applyProcessing();
+    }
+  });
+
+  function autoDetectBgColor() {
+    const data = state.originalData.data;
+    const w = state.originalData.width;
+    const h = state.originalData.height;
+    // Sample corner pixels (top-left, top-right, bottom-left, bottom-right)
+    const corners = [
+      0,                           // top-left
+      (w - 1) * 4,                 // top-right
+      (h - 1) * w * 4,             // bottom-left
+      ((h - 1) * w + (w - 1)) * 4  // bottom-right
+    ];
+    // Also sample a few pixels inward from each corner
+    const samples = [...corners];
+    const offsets = [1, w, w+1]; // pixel right, pixel below, pixel diagonal
+    for (const c of corners) {
+      for (const o of offsets) {
+        const idx = c + o * 4;
+        if (idx >= 0 && idx < data.length - 3) samples.push(idx);
+      }
+    }
+    // Average the sampled colors
+    let rSum = 0, gSum = 0, bSum = 0, count = 0;
+    for (const i of samples) {
+      if (data[i+3] > 128) { // only opaque pixels
+        rSum += data[i]; gSum += data[i+1]; bSum += data[i+2]; count++;
+      }
+    }
+    if (count > 0) {
+      const r = Math.round(rSum / count);
+      const g = Math.round(gSum / count);
+      const b = Math.round(bSum / count);
+      const hex = rgbToHex(r, g, b);
+      state.bgRemovalColor = hex;
+      bgRemovalColorInput.value = hex;
+      bgRemovalHexInput.value = hex;
+      showToast(`Detected background: ${hex}`, 'success');
+    }
+  }
+
+  bgThresholdSlider.addEventListener('input', () => {
+    state.bgThreshold = +bgThresholdSlider.value;
+    bgThresholdValue.textContent = bgThresholdSlider.value;
+    applyProcessing();
+  });
+
+  // ── Upscale ──
+  upscaleToggle.addEventListener('change', () => {
+    state.upscale = upscaleToggle.checked;
+    upscaleOptions.classList.toggle('active', state.upscale);
+    applyProcessing();
+  });
+
+  document.querySelectorAll('.btn-upscale').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.btn-upscale').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.upscaleScale = +btn.dataset.scale;
+      if (state.upscale) applyProcessing();
+    });
+  });
+
+  // ── Preview Background ──
+  document.querySelectorAll('.btn-bg').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.btn-bg').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.previewBg = btn.dataset.bg;
+      comparisonBg.className = 'comparison-bg-checker';
+      if (state.previewBg === 'dark') comparisonBg.classList.add('bg-dark');
+      else if (state.previewBg === 'light') comparisonBg.classList.add('bg-light');
+    });
+  });
+
+  // ── Comparison Slider ──
+  let dragging = false;
+
+  function updateSlider(clientX) {
+    const rect = comparison.getBoundingClientRect();
+    let pct = ((clientX - rect.left) / rect.width) * 100;
+    pct = Math.max(0, Math.min(100, pct));
+    state.sliderPos = pct;
+    comparisonHandle.style.left = pct + '%';
+    // Clip original to left side, processed to right side
+    // Both sit on top of checkerboard — no overlap means transparent pixels show the bg
+    originalLayer.style.clipPath = `inset(0 ${100 - pct}% 0 0)`;
+    processedLayer.style.clipPath = `inset(0 0 0 ${pct}%)`;
+  }
+
+  comparison.addEventListener('mousedown', e => { dragging = true; updateSlider(e.clientX); });
+  window.addEventListener('mousemove', e => { if (dragging) updateSlider(e.clientX); });
+  window.addEventListener('mouseup', () => { dragging = false; });
+
+  comparison.addEventListener('touchstart', e => { dragging = true; updateSlider(e.touches[0].clientX); }, { passive: true });
+  window.addEventListener('touchmove', e => { if (dragging) updateSlider(e.touches[0].clientX); }, { passive: true });
+  window.addEventListener('touchend', () => { dragging = false; });
+
+  // ── Apply Processing (dispatcher) ──
+  let processingTimer = null;
+
+  function applyProcessing() {
+    // Debounce for rapid slider changes
+    clearTimeout(processingTimer);
+    processingTimer = setTimeout(() => {
+      if (state.fileType === 'svg') {
+        applySVGProcessing();
+      } else {
+        applyRasterProcessing();
+      }
+    }, 30);
+  }
+
+  // ── SVG Processing ──
+  function renderOriginalSVG() {
+    const svgStr = state.svgSource;
+    const blob = new Blob([svgStr], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const img = document.createElement('img');
+    img.src = url;
+    img.className = 'svg-preview';
+    originalLayer.innerHTML = '';
+    originalLayer.appendChild(img);
+    // Sizer clone for layout height
+    const sizer = document.createElement('img');
+    sizer.src = URL.createObjectURL(new Blob([svgStr], { type: 'image/svg+xml' }));
+    sizer.className = 'svg-preview';
+    sizer.onload = () => URL.revokeObjectURL(sizer.src);
+    comparisonSizer.innerHTML = '';
+    comparisonSizer.appendChild(sizer);
+    img.onload = () => URL.revokeObjectURL(url);
+  }
+
+  function applySVGProcessing() {
+    // Clone the SVG doc
+    const clone = state.svgDoc.documentElement.cloneNode(true);
+
+    const sourceColor = state.selectedSourceColor;
+    const targetColor = state.targetColor;
+
+    if (sourceColor && targetColor) {
+      replaceSVGColors(clone, sourceColor, targetColor);
+    }
+
+    // If bg removal, remove matching fills
+    if (state.bgRemoval) {
+      removeSVGBackgrounds(clone);
+    }
+
+    const serializer = new XMLSerializer();
+    const svgStr = serializer.serializeToString(clone);
+    const blob = new Blob([svgStr], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const img = document.createElement('img');
+    img.src = url;
+    img.className = 'svg-preview';
+    img.onload = () => URL.revokeObjectURL(url);
+    processedLayer.innerHTML = '';
+    processedLayer.appendChild(img);
+
+    // Store for download
+    state._processedSVG = svgStr;
+    updateDownloadInfo();
+  }
+
+  function replaceSVGColors(node, source, target) {
+    if (node.nodeType !== 1) return;
+
+    for (const attr of ['fill', 'stroke']) {
+      const val = node.getAttribute(attr);
+      if (val) {
+        const normalized = normalizeColor(val);
+        if (normalized === source) node.setAttribute(attr, target);
+      }
+    }
+
+    // Inline styles
+    const style = node.getAttribute('style');
+    if (style) {
+      let newStyle = style;
+      newStyle = newStyle.replace(/(fill\s*:\s*)([^;]+)/gi, (match, prefix, val) => {
+        const n = normalizeColor(val.trim());
+        return n === source ? prefix + target : match;
+      });
+      newStyle = newStyle.replace(/(stroke\s*:\s*)([^;]+)/gi, (match, prefix, val) => {
+        const n = normalizeColor(val.trim());
+        return n === source ? prefix + target : match;
+      });
+      node.setAttribute('style', newStyle);
+    }
+
+    // Style blocks
+    if (node.tagName === 'style' || node.tagName === 'STYLE') {
+      let css = node.textContent;
+      css = css.replace(/(fill\s*:\s*)([^;}\s]+)/gi, (match, prefix, val) => {
+        const n = normalizeColor(val.trim());
+        return n === source ? prefix + target : match;
+      });
+      css = css.replace(/(stroke\s*:\s*)([^;}\s]+)/gi, (match, prefix, val) => {
+        const n = normalizeColor(val.trim());
+        return n === source ? prefix + target : match;
+      });
+      node.textContent = css;
+    }
+
+    // Gradient stops
+    if (node.tagName === 'stop') {
+      const stopColor = node.getAttribute('stop-color');
+      if (stopColor) {
+        const n = normalizeColor(stopColor);
+        if (n === source) node.setAttribute('stop-color', target);
+      }
+    }
+
+    for (const child of node.children) replaceSVGColors(child, source, target);
+  }
+
+  function removeSVGBackgrounds(node) {
+    if (node.nodeType !== 1) return;
+    const threshold = state.bgThreshold;
+    const bgRgb = hexToRgb(state.bgRemovalColor);
+
+    for (const attr of ['fill']) {
+      const val = node.getAttribute(attr);
+      if (val) {
+        const hex = normalizeColor(val);
+        if (hex) {
+          const rgb = hexToRgb(hex);
+          const dist = colorDistance(rgb, bgRgb);
+          if (dist < threshold) {
+            node.setAttribute(attr, 'none');
+            node.setAttribute('fill-opacity', '0');
+          }
+        }
+      }
+    }
+
+    // Inline styles
+    const style = node.getAttribute('style');
+    if (style) {
+      let newStyle = style.replace(/(fill\s*:\s*)([^;]+)/gi, (match, prefix, val) => {
+        const hex = normalizeColor(val.trim());
+        if (hex) {
+          const rgb = hexToRgb(hex);
+          const dist = colorDistance(rgb, bgRgb);
+          if (dist < threshold) return prefix + 'none';
+        }
+        return match;
+      });
+      node.setAttribute('style', newStyle);
+    }
+
+    for (const child of node.children) removeSVGBackgrounds(child);
+  }
+
+  function renderProcessedSVG() {
+    applySVGProcessing();
+  }
+
+  // ── Raster Processing ──
+  function renderOriginalRaster() {
+    const display = document.createElement('canvas');
+    display.width = state.originalCanvas.width;
+    display.height = state.originalCanvas.height;
+    display.style.maxWidth = '100%';
+    display.style.maxHeight = '500px';
+    display.style.objectFit = 'contain';
+    const ctx = display.getContext('2d');
+    ctx.drawImage(state.originalCanvas, 0, 0);
+    originalLayer.innerHTML = '';
+    originalLayer.appendChild(display);
+    // Sizer clone for layout height
+    const sizer = document.createElement('canvas');
+    sizer.width = display.width;
+    sizer.height = display.height;
+    sizer.style.maxWidth = '100%';
+    sizer.style.maxHeight = '500px';
+    sizer.style.objectFit = 'contain';
+    sizer.getContext('2d').drawImage(state.originalCanvas, 0, 0);
+    comparisonSizer.innerHTML = '';
+    comparisonSizer.appendChild(sizer);
+  }
+
+  let currentRunId = 0;
+
+  /**
+   * Flood-fill background removal with interior hole detection.
+   *
+   * Pass 1: BFS from image edges — removes outer background connected to borders.
+   * Pass 2: Scan remaining unvisited bg-colored pixels, flood-fill each connected
+   *         region. If a region is fully enclosed (no edge contact) and large enough,
+   *         it's an interior hole (like inside A, R, D letterforms) — remove it too.
+   *         Small enclosed regions are kept (likely part of the logo detail).
+   *
+   * Returns a Float32 mask (0.0 = remove, 1.0 = keep) for each pixel.
+   */
+  function buildEdgeFloodMask(srcData, w, h, bgRgb, bgThreshold) {
+    const totalPixels = w * h;
+    const maxDist = bgThreshold * 2.5; // tighter matching to avoid eating into logo edges
+
+    // visited: 0 = unvisited, 1 = bg (to remove), 2 = not-bg (keep)
+    const visited = new Uint8Array(totalPixels);
+    const mask = new Float32Array(totalPixels);
+    mask.fill(1.0);
+
+    // Pixel color distance from bg (cached for speed)
+    function pixelDist(p) {
+      const i = p * 4;
+      const a = srcData[i + 3];
+      if (a < 10) return -1; // transparent → treat as bg
+      const dr = srcData[i] - bgRgb.r;
+      const dg = srcData[i + 1] - bgRgb.g;
+      const db = srcData[i + 2] - bgRgb.b;
+      return Math.sqrt(dr * dr + dg * dg + db * db);
+    }
+
+    function isBgPixel(p) {
+      const d = pixelDist(p);
+      return d < 0 || d < maxDist;
+    }
+
+    // Soft fade: 0.0 = exact bg match, 1.0 = at threshold boundary
+    function getBgFactor(p) {
+      const d = pixelDist(p);
+      if (d < 0) return 0.0; // transparent
+      if (d >= maxDist) return 1.0;
+      return d / maxDist;
+    }
+
+    // Generic BFS flood from a set of seed pixels; marks mask and visited
+    function bfsFlood(seeds) {
+      const queue = seeds;
+      let head = 0;
+      while (head < queue.length) {
+        const p = queue[head++];
+        mask[p] = getBgFactor(p);
+
+        const x = p % w;
+        const y = (p - x) / w;
+
+        if (x > 0)     { const np = p - 1; if (!visited[np]) { if (isBgPixel(np)) { visited[np] = 1; queue.push(np); } else { visited[np] = 2; } } }
+        if (x < w - 1) { const np = p + 1; if (!visited[np]) { if (isBgPixel(np)) { visited[np] = 1; queue.push(np); } else { visited[np] = 2; } } }
+        if (y > 0)     { const np = p - w; if (!visited[np]) { if (isBgPixel(np)) { visited[np] = 1; queue.push(np); } else { visited[np] = 2; } } }
+        if (y < h - 1) { const np = p + w; if (!visited[np]) { if (isBgPixel(np)) { visited[np] = 1; queue.push(np); } else { visited[np] = 2; } } }
+      }
+      return queue.length;
+    }
+
+    // ── Pass 1: Flood from edges ──
+    const edgeSeeds = [];
+    for (let x = 0; x < w; x++) {
+      const top = x, bot = (h - 1) * w + x;
+      if (isBgPixel(top) && !visited[top]) { visited[top] = 1; edgeSeeds.push(top); }
+      if (isBgPixel(bot) && !visited[bot]) { visited[bot] = 1; edgeSeeds.push(bot); }
+    }
+    for (let y = 1; y < h - 1; y++) {
+      const left = y * w, right = y * w + (w - 1);
+      if (isBgPixel(left)  && !visited[left])  { visited[left]  = 1; edgeSeeds.push(left); }
+      if (isBgPixel(right) && !visited[right]) { visited[right] = 1; edgeSeeds.push(right); }
+    }
+    bfsFlood(edgeSeeds);
+
+    // ── Pass 2: Find interior holes ──
+    // Minimum hole size in pixels — small enclosed regions are likely logo detail
+    const minHoleSize = Math.max(20, totalPixels * 0.0002);
+
+    for (let p = 0; p < totalPixels; p++) {
+      if (visited[p] !== 0) continue;
+      if (!isBgPixel(p)) { visited[p] = 2; continue; }
+
+      // Flood this unvisited bg region to measure its size
+      // Use a temp collection so we can decide whether to keep or remove
+      const region = [p];
+      visited[p] = 1;
+      let rHead = 0;
+      while (rHead < region.length) {
+        const rp = region[rHead++];
+        const rx = rp % w;
+        const ry = (rp - rx) / w;
+        const nbs = [];
+        if (rx > 0)     nbs.push(rp - 1);
+        if (rx < w - 1) nbs.push(rp + 1);
+        if (ry > 0)     nbs.push(rp - w);
+        if (ry < h - 1) nbs.push(rp + w);
+        for (const np of nbs) {
+          if (visited[np] === 0) {
+            if (isBgPixel(np)) {
+              visited[np] = 1;
+              region.push(np);
+            } else {
+              visited[np] = 2;
+            }
+          }
+        }
+      }
+
+      // Only remove interior holes that are large enough to be actual background
+      if (region.length >= minHoleSize) {
+        for (const rp of region) {
+          mask[rp] = getBgFactor(rp);
+        }
+      } else {
+        // Small region — keep it (likely logo detail)
+        for (const rp of region) {
+          mask[rp] = 1.0;
+        }
+      }
+    }
+
+    return mask;
+  }
+
+  function applyRasterProcessing() {
+    if (!state.originalData) return;
+
+    // Cancel any in-progress run by incrementing the runId
+    currentRunId++;
+    const thisRunId = currentRunId;
+    state.processing = false;
+
+    const src = state.originalData;
+    const w = src.width;
+    const h = src.height;
+    const totalPixels = w * h;
+    const srcData = src.data;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    const output = ctx.createImageData(w, h);
+    const outData = output.data;
+
+    // Copy original
+    outData.set(srcData);
+
+    const hasColorReplace = state.selectedSourceColor && state.targetColor;
+    const sourceRgb = hasColorReplace ? hexToRgb(state.selectedSourceColor) : null;
+    const targetRgb = hasColorReplace ? hexToRgb(state.targetColor) : null;
+    const tolerance = state.tolerance;
+    const doBgRemoval = state.bgRemoval;
+    const bgThreshold = state.bgThreshold;
+    const bgRgb = doBgRemoval ? hexToRgb(state.bgRemovalColor) : null;
+
+    if (!hasColorReplace && !doBgRemoval && !state.upscale) {
+      // No processing needed - show copy of original
+      ctx.putImageData(output, 0, 0);
+      state.processedCanvas = canvas;
+      renderProcessedRaster(canvas);
+      return;
+    }
+
+    state.processing = true;
+
+    // Build the flood-fill mask for bg removal (runs synchronously, fast enough)
+    let bgMask = null;
+    if (doBgRemoval) {
+      showProgress(10, 'Detecting background...');
+      bgMask = buildEdgeFloodMask(srcData, w, h, bgRgb, bgThreshold);
+    }
+
+    // For large images, process in chunks
+    const CHUNK = 50000;
+    let idx = 0;
+
+    function processChunk() {
+      // Check if this run has been superseded by a newer one
+      if (thisRunId !== currentRunId) return;
+
+      const end = Math.min(idx + CHUNK, totalPixels);
+      for (let p = idx; p < end; p++) {
+        const i = p * 4;
+        let r = srcData[i], g = srcData[i+1], b = srcData[i+2], a = srcData[i+3];
+
+        // Background removal using flood-fill mask
+        if (doBgRemoval && bgMask && a > 0) {
+          const keepFactor = bgMask[p];
+          if (keepFactor < 1.0) {
+            a = Math.round(a * keepFactor);
+            // Pre-multiplied alpha correction to prevent color halos
+            if (a > 0 && keepFactor < 1.0) {
+              const correction = Math.min(1, keepFactor + 0.1);
+              if (correction > 0) {
+                r = Math.min(255, Math.max(0, Math.round(r / correction)));
+                g = Math.min(255, Math.max(0, Math.round(g / correction)));
+                b = Math.min(255, Math.max(0, Math.round(b / correction)));
+              }
+            }
+          }
+        }
+
+        // Color replacement
+        if (hasColorReplace && a > 0) {
+          const dist = Math.sqrt((r - sourceRgb.r)**2 + (g - sourceRgb.g)**2 + (b - sourceRgb.b)**2);
+          const maxDist = tolerance * 4.42;
+          if (dist < maxDist) {
+            const blend = 1 - (dist / maxDist);
+            r = Math.round(r + (targetRgb.r - r) * blend);
+            g = Math.round(g + (targetRgb.g - g) * blend);
+            b = Math.round(b + (targetRgb.b - b) * blend);
+          }
+        }
+
+        outData[i] = r;
+        outData[i+1] = g;
+        outData[i+2] = b;
+        outData[i+3] = a;
+      }
+
+      idx = end;
+      const basePct = doBgRemoval ? 20 : 0;
+      const rangePct = doBgRemoval ? 80 : 100;
+      const pct = Math.round(basePct + (idx / totalPixels) * rangePct);
+
+      if (idx < totalPixels) {
+        showProgress(pct, `Processing... ${pct}%`);
+        requestAnimationFrame(processChunk);
+      } else {
+        ctx.putImageData(output, 0, 0);
+
+        // Apply upscaling if enabled
+        if (state.upscale) {
+          const upscaled = upscaleCanvas(canvas, state.upscaleScale);
+          state.processedCanvas = upscaled;
+          state.processing = false;
+          hideProgress();
+          renderProcessedRaster(upscaled);
+        } else {
+          state.processedCanvas = canvas;
+          state.processing = false;
+          hideProgress();
+          renderProcessedRaster(canvas);
+        }
+      }
+    }
+
+    if (totalPixels > CHUNK || doBgRemoval) {
+      showProgress(0, 'Processing...');
+    }
+    processChunk();
+  }
+
+  // ── Upscale with sharpening ──
+  function upscaleCanvas(source, scale) {
+    const sw = source.width;
+    const sh = source.height;
+    const dw = sw * scale;
+    const dh = sh * scale;
+
+    // Step 1: High-quality upscale using browser's bicubic interpolation
+    const upscaled = document.createElement('canvas');
+    upscaled.width = dw;
+    upscaled.height = dh;
+    const uctx = upscaled.getContext('2d');
+    uctx.imageSmoothingEnabled = true;
+    uctx.imageSmoothingQuality = 'high';
+    uctx.drawImage(source, 0, 0, dw, dh);
+
+    // Step 2: Apply unsharp mask for sharpening
+    const sharpened = document.createElement('canvas');
+    sharpened.width = dw;
+    sharpened.height = dh;
+    const sctx = sharpened.getContext('2d');
+
+    const imgData = uctx.getImageData(0, 0, dw, dh);
+    const data = imgData.data;
+
+    // Create blurred version for unsharp mask
+    const blurred = blurImageData(imgData, dw, dh, 1);
+
+    // Unsharp mask: original + strength * (original - blurred)
+    const strength = 0.5;
+    for (let i = 0; i < data.length; i += 4) {
+      for (let c = 0; c < 3; c++) {
+        const diff = data[i + c] - blurred[i + c];
+        data[i + c] = Math.max(0, Math.min(255, Math.round(data[i + c] + strength * diff)));
+      }
+      // Preserve alpha
+    }
+
+    sctx.putImageData(imgData, 0, 0);
+    return sharpened;
+  }
+
+  // Simple box blur for unsharp mask
+  function blurImageData(imageData, w, h, radius) {
+    const src = new Uint8ClampedArray(imageData.data);
+    const out = new Uint8ClampedArray(src.length);
+
+    // Horizontal pass
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let rSum = 0, gSum = 0, bSum = 0, aSum = 0, count = 0;
+        for (let dx = -radius; dx <= radius; dx++) {
+          const nx = Math.min(w-1, Math.max(0, x + dx));
+          const idx = (y * w + nx) * 4;
+          rSum += src[idx]; gSum += src[idx+1]; bSum += src[idx+2]; aSum += src[idx+3];
+          count++;
+        }
+        const idx = (y * w + x) * 4;
+        out[idx] = rSum / count;
+        out[idx+1] = gSum / count;
+        out[idx+2] = bSum / count;
+        out[idx+3] = aSum / count;
+      }
+    }
+
+    // Vertical pass
+    const final = new Uint8ClampedArray(src.length);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let rSum = 0, gSum = 0, bSum = 0, aSum = 0, count = 0;
+        for (let dy = -radius; dy <= radius; dy++) {
+          const ny = Math.min(h-1, Math.max(0, y + dy));
+          const idx = (ny * w + x) * 4;
+          rSum += out[idx]; gSum += out[idx+1]; bSum += out[idx+2]; aSum += out[idx+3];
+          count++;
+        }
+        const idx = (y * w + x) * 4;
+        final[idx] = rSum / count;
+        final[idx+1] = gSum / count;
+        final[idx+2] = bSum / count;
+        final[idx+3] = aSum / count;
+      }
+    }
+    return final;
+  }
+
+  function renderProcessedRaster(canvas) {
+    const display = document.createElement('canvas');
+    display.width = canvas.width;
+    display.height = canvas.height;
+    display.style.maxWidth = '100%';
+    display.style.maxHeight = '500px';
+    display.style.objectFit = 'contain';
+    const ctx = display.getContext('2d');
+    ctx.drawImage(canvas, 0, 0);
+    processedLayer.innerHTML = '';
+    processedLayer.appendChild(display);
+    updateDownloadInfo();
+  }
+
+  // ── Download ──
+  function updateDownloadInfo() {
+    if (state.fileType === 'svg') {
+      downloadInfo.textContent = `SVG \u2022 ${state.imgWidth} x ${state.imgHeight}`;
+    } else {
+      const fmt = state.originalFormat !== 'png' ? `(converted from ${state.originalFormat.toUpperCase()}) ` : '';
+      const outW = state.upscale ? state.imgWidth * state.upscaleScale : state.imgWidth;
+      const outH = state.upscale ? state.imgHeight * state.upscaleScale : state.imgHeight;
+      const upLabel = state.upscale ? `${state.upscaleScale}x upscaled \u2022 ` : '';
+      downloadInfo.textContent = `PNG ${fmt}${upLabel}\u2022 ${outW} x ${outH} \u2022 max quality`;
+    }
+  }
+
+  btnDownload.addEventListener('click', () => {
+    if (state.fileType === 'svg') {
+      downloadSVG();
+    } else {
+      downloadRaster();
+    }
+  });
+
+  function downloadSVG() {
+    const svgStr = state._processedSVG || state.svgSource;
+    const blob = new Blob([svgStr], { type: 'image/svg+xml' });
+    downloadBlob(blob, state.fileName.replace(/\.svg$/i, '') + '_modified.svg');
+  }
+
+  function downloadRaster() {
+    const canvas = state.processedCanvas || state.originalCanvas;
+    if (!canvas) return;
+    canvas.toBlob(blob => {
+      const baseName = state.fileName.replace(/\.(png|jpg|jpeg|webp|avif|gif|bmp|tiff|tif|ico)$/i, '');
+      downloadBlob(blob, baseName + '_modified.png');
+    }, 'image/png', 1.0);
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Downloaded: ' + filename);
+  }
+
+})();
+</script>
+</body>
+</html>
