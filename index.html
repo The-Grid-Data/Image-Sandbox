@@ -758,6 +758,82 @@ body {
   margin: 0 4px;
 }
 
+.btn-zoom.help-btn {
+  font-weight: 700;
+  font-size: 14px;
+  min-width: 28px;
+  padding: 4px 6px;
+  position: relative;
+}
+
+/* Shortcuts popover */
+.shortcuts-popover {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  z-index: 50;
+  min-width: 240px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+.shortcuts-popover.visible { display: block; }
+
+.shortcuts-popover h4 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.shortcuts-popover kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  color: var(--text-primary);
+}
+
+/* Comparison mode select */
+.compare-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.compare-mode-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.compare-mode-select {
+  flex: 1;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+}
+
+.compare-mode-select:focus { border-color: var(--accent); }
+
 /* Zoomable content wrapper inside comparison */
 .comparison-content {
   position: relative;
@@ -989,14 +1065,34 @@ body {
         <button class="btn-bg" data-bg="dark">Dark</button>
         <button class="btn-bg" data-bg="light">Light</button>
       </div>
-      <div class="zoom-controls" id="zoomControls">
-        <button class="btn-zoom" id="btnZoomOut" title="Zoom out (-)">&#8722;</button>
+      <div class="zoom-controls" id="zoomControls" style="position:relative;">
+        <button class="btn-zoom" id="btnZoomOut" title="Zoom out">&#8722;</button>
         <span class="zoom-level" id="zoomLevel">100%</span>
-        <button class="btn-zoom" id="btnZoomIn" title="Zoom in (+)">+</button>
+        <button class="btn-zoom" id="btnZoomIn" title="Zoom in">+</button>
         <button class="btn-zoom" id="btnZoomFit" title="Fit to view">Fit</button>
         <div class="zoom-sep"></div>
-        <button class="btn-zoom" id="btnUndo" title="Undo (Ctrl+Z)">&#8630;</button>
-        <button class="btn-zoom" id="btnRedo" title="Redo (Ctrl+Shift+Z)">&#8631;</button>
+        <button class="btn-zoom" id="btnUndo" title="Undo brush stroke">&#8630;</button>
+        <button class="btn-zoom" id="btnRedo" title="Redo brush stroke">&#8631;</button>
+        <div class="zoom-sep"></div>
+        <button class="btn-zoom help-btn" id="btnHelp" title="Keyboard shortcuts">?</button>
+        <div class="shortcuts-popover" id="shortcutsPopover">
+          <h4>Shortcuts</h4>
+          <div><kbd>Scroll</kbd> Zoom in / out</div>
+          <div><kbd>Space</kbd> + drag &mdash; Pan</div>
+          <div><kbd>&#8984;/Ctrl</kbd> + <kbd>+</kbd> / <kbd>-</kbd> Zoom</div>
+          <div><kbd>&#8984;/Ctrl</kbd> + <kbd>0</kbd> Fit to view</div>
+          <div><kbd>&#8984;/Ctrl</kbd> + <kbd>Z</kbd> Undo brush</div>
+          <div><kbd>&#8984;/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> Redo</div>
+        </div>
+      </div>
+      <div class="compare-mode-row">
+        <span class="compare-mode-label">Compare:</span>
+        <select class="compare-mode-select" id="compareModeSelect">
+          <option value="final">Original vs Final</option>
+          <option value="color">Original vs Color Only</option>
+          <option value="bg">Original vs BG Removed</option>
+          <option value="upscale">Pre-upscale vs Upscaled</option>
+        </select>
       </div>
       <!-- Brush touchup toolbar (visible when bg removal is on) -->
       <div class="brush-toolbar" id="brushToolbar">
@@ -1018,8 +1114,8 @@ body {
           <div class="comparison-processed" id="processedLayer" style="clip-path: inset(0 0 0 50%);"></div>
         </div>
         <div class="comparison-handle" id="comparisonHandle" style="left: 50%;"></div>
-        <span class="comparison-label comparison-label-before">Before</span>
-        <span class="comparison-label comparison-label-after">After</span>
+        <span class="comparison-label comparison-label-before" id="labelBefore">Before</span>
+        <span class="comparison-label comparison-label-after" id="labelAfter">After</span>
         <div class="brush-cursor" id="brushCursor"></div>
         <div class="progress-overlay" id="progressOverlay">
           <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill"></div></div>
@@ -1081,6 +1177,11 @@ body {
     panY: 0,
     undoStack: [],      // Array of Float32Array snapshots
     redoStack: [],
+    compareMode: 'final',
+    // Intermediate canvases for comparison modes
+    _colorOnlyCanvas: null,   // color replacement only (no bg removal, no upscale)
+    _bgOnlyCanvas: null,      // bg removal only (no color change, no upscale)
+    _preUpscaleCanvas: null,  // final result before upscaling
   };
 
   // ── DOM refs ──
@@ -1134,6 +1235,11 @@ body {
   const btnRedo = $('btnRedo');
   const zoomLevelEl = $('zoomLevel');
   const comparisonContent = $('comparisonContent');
+  const btnHelp = $('btnHelp');
+  const shortcutsPopover = $('shortcutsPopover');
+  const compareModeSelect = $('compareModeSelect');
+  const labelBefore = $('labelBefore');
+  const labelAfter = $('labelAfter');
   const btnDownload = $('btnDownload');
   const downloadInfo = $('downloadInfo');
   const progressOverlay = $('progressOverlay');
@@ -1210,6 +1316,11 @@ body {
     state.panY = 0;
     state.undoStack = [];
     state.redoStack = [];
+    state.compareMode = 'final';
+    state._colorOnlyCanvas = null;
+    state._bgOnlyCanvas = null;
+    state._preUpscaleCanvas = null;
+    compareModeSelect.value = 'final';
     upscaleToggle.checked = false;
     upscaleOptions.classList.remove('active');
     brushToolbar.classList.remove('active');
@@ -1922,7 +2033,8 @@ body {
   // ── Zoom / Pan ──
   const ZOOM_MIN = 0.25;
   const ZOOM_MAX = 8;
-  const ZOOM_STEP = 1.25; // multiply/divide per click
+  const ZOOM_STEP = 1.15; // multiply/divide per button click
+  const ZOOM_SCROLL_STEP = 1.06; // gentler step for scroll wheel
 
   function setZoom(level, pivotX, pivotY) {
     const oldZoom = state.zoom;
@@ -1974,10 +2086,10 @@ body {
 
   btnZoomFit.addEventListener('click', () => zoomToFit());
 
-  // Scroll wheel zoom
+  // Scroll wheel zoom (gentle per-tick step)
   comparison.addEventListener('wheel', e => {
     e.preventDefault();
-    const factor = e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+    const factor = e.deltaY < 0 ? ZOOM_SCROLL_STEP : 1 / ZOOM_SCROLL_STEP;
     setZoom(state.zoom * factor, e.clientX, e.clientY);
   }, { passive: false });
 
@@ -1988,7 +2100,7 @@ body {
   let spaceHeld = false;
 
   window.addEventListener('keydown', e => {
-    if (e.code === 'Space' && !e.repeat && document.activeElement?.tagName !== 'INPUT') {
+    if (e.code === 'Space' && !e.repeat && !['INPUT','SELECT'].includes(document.activeElement?.tagName)) {
       spaceHeld = true;
       comparison.style.cursor = 'grab';
       e.preventDefault();
@@ -2076,7 +2188,7 @@ body {
 
   // Keyboard zoom shortcuts
   window.addEventListener('keydown', e => {
-    if (document.activeElement?.tagName === 'INPUT') return;
+    if (['INPUT','SELECT'].includes(document.activeElement?.tagName)) return;
     if ((e.key === '=' || e.key === '+') && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       const rect = comparison.getBoundingClientRect();
@@ -2142,7 +2254,7 @@ body {
 
   // Ctrl+Z / Ctrl+Shift+Z keyboard shortcuts
   window.addEventListener('keydown', e => {
-    if (document.activeElement?.tagName === 'INPUT') return;
+    if (['INPUT','SELECT'].includes(document.activeElement?.tagName)) return;
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
       e.preventDefault();
       undo();
@@ -2154,6 +2266,97 @@ body {
       redo();
     }
   });
+
+  // ── Shortcuts Popover ──
+  btnHelp.addEventListener('click', e => {
+    e.stopPropagation();
+    shortcutsPopover.classList.toggle('visible');
+  });
+  document.addEventListener('click', e => {
+    if (!shortcutsPopover.contains(e.target) && e.target !== btnHelp) {
+      shortcutsPopover.classList.remove('visible');
+    }
+  });
+
+  // ── Comparison Mode ──
+  const COMPARE_LABELS = {
+    final:   ['Original', 'Final'],
+    color:   ['Original', 'Color Only'],
+    bg:      ['Original', 'BG Removed'],
+    upscale: ['Pre-upscale', 'Upscaled'],
+  };
+
+  compareModeSelect.addEventListener('change', () => {
+    state.compareMode = compareModeSelect.value;
+    const labels = COMPARE_LABELS[state.compareMode] || ['Before', 'After'];
+    labelBefore.textContent = labels[0];
+    labelAfter.textContent = labels[1];
+    updateComparisonLayers();
+  });
+
+  function updateComparisonLayers() {
+    const mode = state.compareMode;
+
+    if (state.fileType === 'svg') {
+      // SVG: only 'final' mode is meaningful; other modes fall back to final
+      return;
+    }
+
+    if (!state.originalCanvas) return;
+
+    // Determine what the "before" (left) and "after" (right) canvases are
+    let beforeCanvas = state.originalCanvas;
+    let afterCanvas = state.processedCanvas;
+
+    if (mode === 'color') {
+      afterCanvas = state._colorOnlyCanvas || state.processedCanvas;
+    } else if (mode === 'bg') {
+      afterCanvas = state._bgOnlyCanvas || state.processedCanvas;
+    } else if (mode === 'upscale') {
+      beforeCanvas = state._preUpscaleCanvas || state.originalCanvas;
+      afterCanvas = state.processedCanvas;
+    }
+    // 'final' = original vs processedCanvas (default)
+
+    // Render before layer
+    renderCanvasToLayer(beforeCanvas, originalLayer);
+    // Render after layer
+    renderCanvasToLayer(afterCanvas, processedLayer);
+
+    // Re-apply brush mask on the after side if applicable and mode is final/bg
+    if (state.brushMask && (mode === 'final' || mode === 'bg')) {
+      applyBrushToProcessed();
+    }
+
+    // Update sizer
+    const sizer = document.createElement('canvas');
+    sizer.width = state.originalCanvas.width;
+    sizer.height = state.originalCanvas.height;
+    sizer.style.maxWidth = '100%';
+    sizer.style.maxHeight = '500px';
+    sizer.style.objectFit = 'contain';
+    sizer.getContext('2d').drawImage(state.originalCanvas, 0, 0);
+    comparisonSizer.innerHTML = '';
+    comparisonSizer.appendChild(sizer);
+  }
+
+  function renderCanvasToLayer(srcCanvas, layer) {
+    if (!srcCanvas) return;
+    const displayW = state.originalCanvas.width;
+    const displayH = state.originalCanvas.height;
+    const display = document.createElement('canvas');
+    display.width = displayW;
+    display.height = displayH;
+    display.style.maxWidth = '100%';
+    display.style.maxHeight = '500px';
+    display.style.objectFit = 'contain';
+    const ctx = display.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(srcCanvas, 0, 0, displayW, displayH);
+    layer.innerHTML = '';
+    layer.appendChild(display);
+  }
 
   // ── Comparison Slider ──
   let dragging = false;
@@ -2565,6 +2768,9 @@ body {
       // No processing needed - show copy of original
       ctx.putImageData(output, 0, 0);
       state.processedCanvas = canvas;
+      state._colorOnlyCanvas = null;
+      state._bgOnlyCanvas = null;
+      state._preUpscaleCanvas = canvas;
       renderProcessedRaster(canvas);
       return;
     }
@@ -2641,6 +2847,70 @@ body {
         requestAnimationFrame(processChunk);
       } else {
         ctx.putImageData(output, 0, 0);
+
+        // Build intermediate canvases for comparison modes
+        state._colorOnlyCanvas = null;
+        state._bgOnlyCanvas = null;
+        state._preUpscaleCanvas = null;
+
+        if (hasColorReplace) {
+          // Color-only: apply color replacement to original, no bg removal
+          const cCanvas = document.createElement('canvas');
+          cCanvas.width = w; cCanvas.height = h;
+          const cCtx = cCanvas.getContext('2d');
+          const cImg = cCtx.createImageData(w, h);
+          const cData = cImg.data;
+          for (let p = 0; p < totalPixels; p++) {
+            const i = p * 4;
+            let r = srcData[i], g = srcData[i+1], b = srcData[i+2], a = srcData[i+3];
+            if (a > 0) {
+              const dist = Math.sqrt((r - sourceRgb.r)**2 + (g - sourceRgb.g)**2 + (b - sourceRgb.b)**2);
+              const maxDist = tolerance * 4.42;
+              if (dist < maxDist) {
+                const blend = 1 - (dist / maxDist);
+                r = Math.round(r + (targetRgb.r - r) * blend);
+                g = Math.round(g + (targetRgb.g - g) * blend);
+                b = Math.round(b + (targetRgb.b - b) * blend);
+              }
+            }
+            cData[i] = r; cData[i+1] = g; cData[i+2] = b; cData[i+3] = a;
+          }
+          cCtx.putImageData(cImg, 0, 0);
+          state._colorOnlyCanvas = cCanvas;
+        }
+
+        if (doBgRemoval && bgMask) {
+          // BG-only: apply bg removal to original, no color change
+          const bCanvas = document.createElement('canvas');
+          bCanvas.width = w; bCanvas.height = h;
+          const bCtx = bCanvas.getContext('2d');
+          const bImg = bCtx.createImageData(w, h);
+          const bData = bImg.data;
+          for (let p = 0; p < totalPixels; p++) {
+            const i = p * 4;
+            let r = srcData[i], g = srcData[i+1], b = srcData[i+2], a = srcData[i+3];
+            if (a > 0) {
+              const keepFactor = bgMask[p];
+              if (keepFactor < 1.0) {
+                a = Math.round(a * keepFactor);
+                if (a > 0) {
+                  const correction = Math.min(1, keepFactor + 0.1);
+                  if (correction > 0) {
+                    r = Math.min(255, Math.max(0, Math.round(r / correction)));
+                    g = Math.min(255, Math.max(0, Math.round(g / correction)));
+                    b = Math.min(255, Math.max(0, Math.round(b / correction)));
+                  }
+                }
+              }
+            }
+            bData[i] = r; bData[i+1] = g; bData[i+2] = b; bData[i+3] = a;
+          }
+          bCtx.putImageData(bImg, 0, 0);
+          state._bgOnlyCanvas = bCanvas;
+        }
+
+        // Save pre-upscale canvas (the full edit without upscale)
+        state._preUpscaleCanvas = canvas;
 
         // Apply upscaling if enabled
         if (state.upscale) {
@@ -2751,8 +3021,13 @@ body {
   }
 
   function renderProcessedRaster(canvas) {
-    // Always display at original dimensions so it aligns with the original layer
-    // and sizer. The full-res upscaled canvas is kept in state for download.
+    if (state.compareMode !== 'final') {
+      // Non-default comparison mode: use the comparison layer system
+      updateComparisonLayers();
+      updateDownloadInfo();
+      return;
+    }
+    // Default: display processed at original dimensions for alignment
     const displayW = state.originalCanvas.width;
     const displayH = state.originalCanvas.height;
     const display = document.createElement('canvas');
