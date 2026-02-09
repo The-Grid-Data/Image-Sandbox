@@ -38,19 +38,39 @@ Commit early and often:
 
 ## Architecture
 
-**Current (pre-refactor):** Single self-contained `index.html` file (~3200 lines, vanilla HTML/CSS/JS in IIFE, no dependencies).
+Multi-file structure using `window.App` global namespace (no bundler):
 
-**Next task:** Refactor into multi-file structure:
-- `index.html` — Lean HTML structure + script/style includes
-- `styles.css` — All CSS
-- `js/` directory — ~11 JS modules using `window.App` global namespace
-- See `RALPH_TASK.md` for full refactoring plan and file breakdown
+```
+index.html          (~215 lines — HTML shell + script/style includes)
+styles.css          (all CSS)
+js/
+  state.js          — window.App namespace, state object, $ helper, App.dom cache
+  utils.js          — showToast, showProgress, hideProgress, color math
+  comparison.js     — updateComparisonLayers, renderCanvasToLayer, updateSlider
+  zoom-pan.js       — setZoom, zoomToFit, applyZoomTransform, undo/redo
+  upscale.js        — upscaleCanvas, blurImageData
+  bg-removal.js     — flood-fill mask, erosion, raster processing, brush tools
+  color-replacement.js — SVG processing, replaceSVGColors, removeSVGBackgrounds
+  color-detection.js   — detectSVGColors, detectRasterColors, renderSwatches
+  file-handling.js     — handleFile, loadSVG, loadRaster, resetState
+  download.js          — downloadSVG, downloadRaster, downloadBlob
+  app.js               — applyProcessing dispatcher, event wiring (loaded last)
+```
+
+### Script Load Order (all `defer`)
+state.js → utils.js → comparison.js → zoom-pan.js → upscale.js → bg-removal.js → color-replacement.js → color-detection.js → file-handling.js → download.js → app.js
+
+### Namespace Pattern
+- `window.App` created in state.js
+- Each module registers: `App.utils = {...}`, `App.comparison = {...}`, etc.
+- Functions reference each other as `App.moduleName.functionName()`
+- DOM refs cached in `App.dom`
 
 ## Conventions
 - No external dependencies or build tools
 - Dark-themed UI (#1a1a2e bg, #a855f7 purple accent)
 - Vanilla JS only — no frameworks, no bundlers
-- Test command (current single-file): `node -e "const fs=require('fs');const h=fs.readFileSync('index.html','utf-8');const m=h.match(/<script>([\s\S]*?)<\/script>/);new Function(m[1]);console.log('OK')"`
+- Test command: `for f in js/*.js; do node -c "$f" || exit 1; done && echo OK`
 
 ## State Files
 ```

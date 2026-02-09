@@ -1,6 +1,6 @@
 ---
 task: Image Sandbox - Refactor to Multi-File Architecture
-test_command: "node -e \"const fs=require('fs');const h=fs.readFileSync('index.html','utf-8');const m=h.match(/<script[^>]*>([\\s\\S]*?)<\\/script>/);if(m)new Function(m[1]);console.log('OK')\""
+test_command: "for f in js/*.js; do node -c \"$f\" || exit 1; done && echo OK"
 ---
 
 # Task: Image Sandbox - Refactor to Multi-File Architecture
@@ -10,8 +10,8 @@ The single `index.html` has grown to ~3200+ lines. Refactor into a clean multi-f
 ## Success Criteria
 
 ### Phase 1: File Split
-1. [ ] Split CSS into `styles.css` (linked via `<link rel="stylesheet">`)
-2. [ ] Split JS into logical modules loaded via `<script src="">` tags:
+1. [x] Split CSS into `styles.css` (linked via `<link rel="stylesheet">`)
+2. [x] Split JS into logical modules loaded via `<script src="">` tags:
    - `js/state.js` — State object + DOM refs
    - `js/utils.js` — Shared helpers (hex/rgb conversion, toast, progress)
    - `js/file-handling.js` — Drop zone, file loading, format detection
@@ -23,11 +23,11 @@ The single `index.html` has grown to ~3200+ lines. Refactor into a clean multi-f
    - `js/zoom-pan.js` — Zoom, pan, undo/redo
    - `js/download.js` — Download logic
    - `js/app.js` — Main init, event wiring, processing dispatcher
-3. [ ] HTML file is lean (structure + script/style includes only, ~100-200 lines)
+3. [x] HTML file is lean (structure + script/style includes only, ~100-200 lines)
 4. [ ] All features still work after split (manual end-to-end test)
 
 ### Phase 2: Verification
-5. [ ] Syntax check passes on all JS files
+5. [x] Syntax check passes on all JS files
 6. [ ] SVG color change works (Make White, Make Black, Custom)
 7. [ ] Raster color change works with tolerance slider
 8. [ ] Background removal works (auto-detect, threshold, edge protection)
@@ -39,7 +39,7 @@ The single `index.html` has grown to ~3200+ lines. Refactor into a clean multi-f
 14. [ ] Favicon and meta tags preserved
 
 ### Phase 3: Cleanup
-15. [ ] Update CLAUDE.md to reflect new multi-file architecture
+15. [x] Update CLAUDE.md to reflect new multi-file architecture
 16. [ ] Commit and push with descriptive message
 
 ## Previous Task (Completed)

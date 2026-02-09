@@ -1,8 +1,8 @@
 # Progress Log
 
 ## Summary
-- Iterations completed: 3
-- Current status: All features implemented. Refactoring to multi-file planned for next session.
+- Iterations completed: 4
+- Current status: Multi-file refactor complete. File split done, syntax checks pass. Needs browser testing for Phase 2 verification.
 
 ## Session History
 
@@ -68,7 +68,36 @@
   - Use window.App global namespace pattern (no bundler)
   - Script defer loading in dependency order
 
+### Iteration 4 - Multi-File Refactor
+- **Task**: Refactor monolithic index.html into multi-file architecture
+- **Work completed**:
+  - Extracted all CSS (943 lines) to `styles.css`
+  - Created 11 JS modules in `js/` directory using `window.App` global namespace
+  - `js/state.js` — App namespace, state object, $ helper, App.dom cache (60+ DOM refs)
+  - `js/utils.js` — showToast, showProgress, hideProgress, normalizeColor, rgbToHex, hexToRgb, colorDistance, luminance
+  - `js/comparison.js` — updateComparisonLayers, renderCanvasToLayer, updateSlider
+  - `js/zoom-pan.js` — setZoom, zoomToFit, applyZoomTransform, pushUndo, undo, redo
+  - `js/upscale.js` — upscaleCanvas, blurImageData
+  - `js/bg-removal.js` — buildEdgeFloodMask, erodeMask, applyRasterProcessing, brush tools, renderOriginalRaster, renderProcessedRaster, autoDetectBgColor (~400 lines, largest module)
+  - `js/color-replacement.js` — applySVGProcessing, replaceSVGColors, removeSVGBackgrounds, renderOriginalSVG
+  - `js/color-detection.js` — detectSVGColors, detectRasterColors, renderSwatches, selectSourceColor, highlightSwatch
+  - `js/file-handling.js` — handleFile, loadSVG, loadRaster, resetState, showEditor
+  - `js/download.js` — downloadSVG, downloadRaster, downloadBlob, updateDownloadInfo
+  - `js/app.js` — applyProcessing dispatcher, clearPresetButtons, all 40+ event listeners centralized
+  - Slimmed `index.html` from ~3130 lines to ~215 lines (HTML shell + script/style includes)
+  - All 11 JS files pass `node -c` syntax check
+  - Updated CLAUDE.md with new architecture documentation
+- **Key design decisions**:
+  - `window.App` global namespace — each module registers on `App.moduleName`
+  - Module-local `let` vars (brushPainting, panning, currentRunId, dragging, processingTimer) exposed via getter/setter methods
+  - All event listeners centralized in app.js init function (loaded last via `defer`)
+  - Forward references between modules are safe (called at runtime only, not at parse time)
+  - Nested functions (walkNode, pixelDist, processChunk, etc.) stay nested in their parent functions
+- **Pending**: Browser testing for Phase 2 verification (criteria 4, 6-14)
+
 ## File Size Tracking
-- index.html: ~3200+ lines (needs refactoring)
+- index.html: ~215 lines (down from ~3130)
+- styles.css: ~943 lines
+- js/ directory: 11 files, ~2000 lines total
 - Total feature count: 16 major features
-- Git commits: 9 on main branch
+- Git commits: 10 on main branch

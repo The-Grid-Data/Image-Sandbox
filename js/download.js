@@ -1,0 +1,47 @@
+// js/download.js — Download logic
+'use strict';
+
+App.download = {
+  updateDownloadInfo: function() {
+    var state = App.state;
+    var dom = App.dom;
+    if (state.fileType === 'svg') {
+      dom.downloadInfo.textContent = 'SVG \u2022 ' + state.imgWidth + ' x ' + state.imgHeight;
+    } else {
+      var fmt = state.originalFormat !== 'png' ? '(converted from ' + state.originalFormat.toUpperCase() + ') ' : '';
+      var outW = state.upscale ? state.imgWidth * state.upscaleScale : state.imgWidth;
+      var outH = state.upscale ? state.imgHeight * state.upscaleScale : state.imgHeight;
+      var upLabel = state.upscale ? state.upscaleScale + 'x upscaled \u2022 ' : '';
+      dom.downloadInfo.textContent = 'PNG ' + fmt + upLabel + '\u2022 ' + outW + ' x ' + outH + ' \u2022 max quality';
+    }
+  },
+
+  downloadSVG: function() {
+    var state = App.state;
+    var svgStr = state._processedSVG || state.svgSource;
+    var blob = new Blob([svgStr], { type: 'image/svg+xml' });
+    App.download.downloadBlob(blob, state.fileName.replace(/\.svg$/i, '') + '_modified.svg');
+  },
+
+  downloadRaster: function() {
+    var state = App.state;
+    var canvas = state._brushedCanvas || state.processedCanvas || state.originalCanvas;
+    if (!canvas) return;
+    canvas.toBlob(function(blob) {
+      var baseName = state.fileName.replace(/\.(png|jpg|jpeg|webp|avif|gif|bmp|tiff|tif|ico)$/i, '');
+      App.download.downloadBlob(blob, baseName + '_modified.png');
+    }, 'image/png', 1.0);
+  },
+
+  downloadBlob: function(blob, filename) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    App.utils.showToast('Downloaded: ' + filename);
+  },
+};
