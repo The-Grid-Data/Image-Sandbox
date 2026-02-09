@@ -769,14 +769,12 @@ body {
 /* Shortcuts popover */
 .shortcuts-popover {
   display: none;
-  position: absolute;
-  bottom: calc(100% + 8px);
-  right: 0;
+  position: fixed;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 12px 16px;
-  z-index: 50;
+  z-index: 100;
   min-width: 240px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.4);
   font-size: 12px;
@@ -983,9 +981,9 @@ body {
     <div class="panel" id="controlsPanel">
       <div class="panel-title">Quick Presets</div>
       <div class="presets">
-        <button class="btn-preset" id="presetWhite">Make White (for dark bg)</button>
-        <button class="btn-preset" id="presetBlack">Make Black (for light bg)</button>
-        <button class="btn-preset" id="presetCustom">Custom Color</button>
+        <button class="btn-preset" id="presetWhite" title="Replace the darkest detected color with white">Make White (for dark bg)</button>
+        <button class="btn-preset" id="presetBlack" title="Replace the lightest detected color with black">Make Black (for light bg)</button>
+        <button class="btn-preset" id="presetCustom" title="Pick a source color and target color manually">Custom Color</button>
       </div>
 
       <!-- Detected colors -->
@@ -1005,7 +1003,7 @@ body {
 
       <!-- Tolerance (raster only) -->
       <div class="slider-row" id="toleranceRow" style="display:none;">
-        <label>Color tolerance:</label>
+        <label title="How loosely to match colors — higher values replace more similar shades">Color tolerance:</label>
         <input type="range" id="toleranceSlider" min="0" max="150" value="50">
         <span class="slider-value" id="toleranceValue">50</span>
       </div>
@@ -1016,7 +1014,7 @@ body {
           <input type="checkbox" id="bgRemovalToggle">
           <span class="toggle-slider"></span>
         </label>
-        <label for="bgRemovalToggle">Remove background (edge-aware)</label>
+        <label for="bgRemovalToggle" title="Flood-fill from image edges to remove background color while preserving the logo">Remove background (edge-aware)</label>
       </div>
       <div class="bg-removal-options" id="bgRemovalOptions">
         <div class="color-row">
@@ -1028,12 +1026,12 @@ body {
           </div>
         </div>
         <div class="slider-row">
-          <label>Threshold:</label>
+          <label title="How aggressively to match background color — higher = more pixels removed">Threshold:</label>
           <input type="range" id="bgThresholdSlider" min="5" max="80" value="20">
           <span class="slider-value" id="bgThresholdValue">20</span>
         </div>
         <div class="slider-row">
-          <label>Edge protection:</label>
+          <label title="Pixels to erode inward from the removal boundary to protect logo edges">Edge protection:</label>
           <input type="range" id="edgeProtectSlider" min="0" max="8" value="2">
           <span class="slider-value" id="edgeProtectValue">2</span>
         </div>
@@ -1046,7 +1044,7 @@ body {
           <input type="checkbox" id="upscaleToggle">
           <span class="toggle-slider"></span>
         </label>
-        <label for="upscaleToggle">Enhance &amp; upscale</label>
+        <label for="upscaleToggle" title="Increase image resolution with bicubic interpolation and sharpening">Enhance &amp; upscale</label>
       </div>
       <div class="upscale-options" id="upscaleOptions">
         <div class="presets" style="margin-bottom:0;">
@@ -1075,19 +1073,10 @@ body {
         <button class="btn-zoom" id="btnRedo" title="Redo brush stroke">&#8631;</button>
         <div class="zoom-sep"></div>
         <button class="btn-zoom help-btn" id="btnHelp" title="Keyboard shortcuts">?</button>
-        <div class="shortcuts-popover" id="shortcutsPopover">
-          <h4>Shortcuts</h4>
-          <div><kbd>Scroll</kbd> Zoom in / out</div>
-          <div><kbd>Space</kbd> + drag &mdash; Pan</div>
-          <div><kbd>&#8984;/Ctrl</kbd> + <kbd>+</kbd> / <kbd>-</kbd> Zoom</div>
-          <div><kbd>&#8984;/Ctrl</kbd> + <kbd>0</kbd> Fit to view</div>
-          <div><kbd>&#8984;/Ctrl</kbd> + <kbd>Z</kbd> Undo brush</div>
-          <div><kbd>&#8984;/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> Redo</div>
-        </div>
       </div>
       <div class="compare-mode-row">
         <span class="compare-mode-label">Compare:</span>
-        <select class="compare-mode-select" id="compareModeSelect">
+        <select class="compare-mode-select" id="compareModeSelect" title="Choose which processing step to compare in the before/after slider">
           <option value="final">Original vs Final</option>
           <option value="color">Original vs Color Only</option>
           <option value="bg">Original vs BG Removed</option>
@@ -1127,11 +1116,22 @@ body {
     <!-- Download -->
     <div class="panel">
       <div class="download-bar">
-        <button class="btn-download" id="btnDownload">&#11015; Download</button>
+        <button class="btn-download" id="btnDownload" title="Download the processed image (raster formats are saved as max-quality PNG)">&#11015; Download</button>
         <span class="download-info" id="downloadInfo"></span>
       </div>
     </div>
   </div>
+</div>
+
+<!-- Shortcuts popover (fixed position, outside panel to avoid overflow clipping) -->
+<div class="shortcuts-popover" id="shortcutsPopover">
+  <h4>Shortcuts</h4>
+  <div><kbd>Scroll</kbd> Zoom in / out</div>
+  <div><kbd>Space</kbd> + drag &mdash; Pan</div>
+  <div><kbd>&#8984;/Ctrl</kbd> + <kbd>+</kbd> / <kbd>-</kbd> Zoom</div>
+  <div><kbd>&#8984;/Ctrl</kbd> + <kbd>0</kbd> Fit to view</div>
+  <div><kbd>&#8984;/Ctrl</kbd> + <kbd>Z</kbd> Undo brush</div>
+  <div><kbd>&#8984;/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> Redo</div>
 </div>
 
 <!-- Toast container -->
@@ -2270,7 +2270,12 @@ body {
   // ── Shortcuts Popover ──
   btnHelp.addEventListener('click', e => {
     e.stopPropagation();
-    shortcutsPopover.classList.toggle('visible');
+    const isVisible = shortcutsPopover.classList.toggle('visible');
+    if (isVisible) {
+      const rect = btnHelp.getBoundingClientRect();
+      shortcutsPopover.style.top = (rect.bottom + 6) + 'px';
+      shortcutsPopover.style.right = (window.innerWidth - rect.right) + 'px';
+    }
   });
   document.addEventListener('click', e => {
     if (!shortcutsPopover.contains(e.target) && e.target !== btnHelp) {
@@ -2298,8 +2303,7 @@ body {
     const mode = state.compareMode;
 
     if (state.fileType === 'svg') {
-      // SVG: only 'final' mode is meaningful; other modes fall back to final
-      return;
+      return; // SVG: only 'final' mode is meaningful
     }
 
     if (!state.originalCanvas) return;
@@ -2307,6 +2311,8 @@ body {
     // Determine what the "before" (left) and "after" (right) canvases are
     let beforeCanvas = state.originalCanvas;
     let afterCanvas = state.processedCanvas;
+    // For upscale mode, render at upscaled resolution to show detail difference
+    let useUpscaleRes = false;
 
     if (mode === 'color') {
       afterCanvas = state._colorOnlyCanvas || state.processedCanvas;
@@ -2315,35 +2321,49 @@ body {
     } else if (mode === 'upscale') {
       beforeCanvas = state._preUpscaleCanvas || state.originalCanvas;
       afterCanvas = state.processedCanvas;
+      useUpscaleRes = state.upscale;
     }
-    // 'final' = original vs processedCanvas (default)
 
-    // Render before layer
-    renderCanvasToLayer(beforeCanvas, originalLayer);
-    // Render after layer
-    renderCanvasToLayer(afterCanvas, processedLayer);
+    if (useUpscaleRes && afterCanvas) {
+      // Use the upscaled resolution so the detail/quality difference is visible
+      const upW = afterCanvas.width;
+      const upH = afterCanvas.height;
+      renderCanvasToLayer(beforeCanvas, originalLayer, upW, upH);
+      renderCanvasToLayer(afterCanvas, processedLayer, upW, upH);
+      // Sizer at upscaled dimensions
+      const sizer = document.createElement('canvas');
+      sizer.width = upW; sizer.height = upH;
+      sizer.style.maxWidth = '100%';
+      sizer.style.maxHeight = '500px';
+      sizer.style.objectFit = 'contain';
+      sizer.getContext('2d').drawImage(beforeCanvas, 0, 0, upW, upH);
+      comparisonSizer.innerHTML = '';
+      comparisonSizer.appendChild(sizer);
+    } else {
+      renderCanvasToLayer(beforeCanvas, originalLayer);
+      renderCanvasToLayer(afterCanvas, processedLayer);
+      // Sizer at original dimensions
+      const sizer = document.createElement('canvas');
+      sizer.width = state.originalCanvas.width;
+      sizer.height = state.originalCanvas.height;
+      sizer.style.maxWidth = '100%';
+      sizer.style.maxHeight = '500px';
+      sizer.style.objectFit = 'contain';
+      sizer.getContext('2d').drawImage(state.originalCanvas, 0, 0);
+      comparisonSizer.innerHTML = '';
+      comparisonSizer.appendChild(sizer);
+    }
 
-    // Re-apply brush mask on the after side if applicable and mode is final/bg
+    // Re-apply brush mask on the after side if applicable
     if (state.brushMask && (mode === 'final' || mode === 'bg')) {
       applyBrushToProcessed();
     }
-
-    // Update sizer
-    const sizer = document.createElement('canvas');
-    sizer.width = state.originalCanvas.width;
-    sizer.height = state.originalCanvas.height;
-    sizer.style.maxWidth = '100%';
-    sizer.style.maxHeight = '500px';
-    sizer.style.objectFit = 'contain';
-    sizer.getContext('2d').drawImage(state.originalCanvas, 0, 0);
-    comparisonSizer.innerHTML = '';
-    comparisonSizer.appendChild(sizer);
   }
 
-  function renderCanvasToLayer(srcCanvas, layer) {
+  function renderCanvasToLayer(srcCanvas, layer, overrideW, overrideH) {
     if (!srcCanvas) return;
-    const displayW = state.originalCanvas.width;
-    const displayH = state.originalCanvas.height;
+    const displayW = overrideW || state.originalCanvas.width;
+    const displayH = overrideH || state.originalCanvas.height;
     const display = document.createElement('canvas');
     display.width = displayW;
     display.height = displayH;
