@@ -53,7 +53,22 @@
 - **Instruction**: The sizer, original layer, and processed layer canvases must all be consistent. If upscale changes dimensions, the display canvas must still use CSS constraints (max-width/max-height/object-fit) to match visually
 - **Added after**: Iteration 1 - upscale caused canvas offset in preview
 
-### Sign: Single File Architecture
-- **Trigger**: When adding new features
-- **Instruction**: This project is a single self-contained index.html. All HTML, CSS, and JS must stay in one file. No external dependencies
-- **Added after**: Core architecture decision
+### Sign: Z-Index Stacking With CSS Transforms
+- **Trigger**: When elements with position:absolute are siblings of a CSS-transformed wrapper
+- **Instruction**: A CSS `transform` on an element creates a new stacking context. Set explicit `z-index` on the transformed wrapper (low, e.g. 1) and higher z-index on sibling overlays (e.g. 20). DOM order alone is NOT enough
+- **Added after**: Iteration 2 - comparison handle and labels were invisible because comparisonContent's transform created a stacking context that painted over them
+
+### Sign: Fixed Position for Popovers in Overflow:Hidden Parents
+- **Trigger**: When adding popover/tooltip/dropdown that must escape its container
+- **Instruction**: Use `position: fixed` and calculate coordinates via `getBoundingClientRect()` in JS. Place the popover element at document body level, not inside the clipped container
+- **Added after**: Iteration 2 - shortcuts popover was invisible because preview panel had overflow:hidden
+
+### Sign: Upscale Comparison Needs Full Resolution
+- **Trigger**: When comparing pre-upscale vs upscaled images
+- **Instruction**: Render BOTH sides at the upscaled resolution. If you render at original dimensions, the upscaled canvas gets scaled back down and looks identical to the pre-upscale version
+- **Added after**: Iteration 2 - upscale comparison mode showed identical images
+
+### Sign: Multi-File Refactoring Strategy
+- **Trigger**: When index.html exceeds ~2000 lines
+- **Instruction**: Use `window.App` global namespace pattern. Load scripts with `defer` in dependency order. Split by feature domain (state, utils, color, bg-removal, upscale, zoom, etc.). The IIFE must be unwrapped — all functions become methods on App or standalone globals
+- **Added after**: Iteration 3 - file grew to 3200+ lines, becoming hard to navigate

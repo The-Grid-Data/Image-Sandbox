@@ -1,4 +1,4 @@
-# Logo Color Changer
+# Image Sandbox
 
 ## Ralph Methodology
 
@@ -37,13 +37,20 @@ Commit early and often:
 - Remote: https://github.com/wcfcarolina13/Image-Sandbox.git
 
 ## Architecture
-- Single self-contained `index.html` file (vanilla HTML/CSS/JS, no dependencies)
-- Dark-themed UI (#1a1a2e bg, #a855f7 purple accent)
+
+**Current (pre-refactor):** Single self-contained `index.html` file (~3200 lines, vanilla HTML/CSS/JS in IIFE, no dependencies).
+
+**Next task:** Refactor into multi-file structure:
+- `index.html` — Lean HTML structure + script/style includes
+- `styles.css` — All CSS
+- `js/` directory — ~11 JS modules using `window.App` global namespace
+- See `RALPH_TASK.md` for full refactoring plan and file breakdown
 
 ## Conventions
 - No external dependencies or build tools
-- All code in one file (HTML + CSS + JS in IIFE)
-- Test command: `node -e "const fs=require('fs');const h=fs.readFileSync('index.html','utf-8');const m=h.match(/<script>([\s\S]*?)<\/script>/);new Function(m[1]);console.log('OK')"`
+- Dark-themed UI (#1a1a2e bg, #a855f7 purple accent)
+- Vanilla JS only — no frameworks, no bundlers
+- Test command (current single-file): `node -e "const fs=require('fs');const h=fs.readFileSync('index.html','utf-8');const m=h.match(/<script>([\s\S]*?)<\/script>/);new Function(m[1]);console.log('OK')"`
 
 ## State Files
 ```
@@ -52,5 +59,5 @@ Commit early and often:
 ├── progress.md      # What's been accomplished
 ├── errors.log       # Failure history
 ├── activity.log     # Session activity
-└── .iteration       # Current iteration counter
+└── .iteration       # Current iteration counter (currently: 3)
 ```
