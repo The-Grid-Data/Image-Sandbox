@@ -130,6 +130,7 @@ App.colorDetection = {
     el.classList.add('selected');
     dom.targetColorRow.style.display = '';
     if (state.fileType === 'raster') dom.toleranceRow.style.display = '';
+    App.app.updateBrushToolbar();
     App.app.applyProcessing();
   },
 

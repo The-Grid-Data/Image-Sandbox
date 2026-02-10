@@ -826,6 +826,20 @@ body {
 
 .compare-mode-select:focus { border-color: var(--accent); }
 
+.btn-selective {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+.btn-selective:hover { border-color: var(--accent); color: var(--text-primary); }
+.btn-selective.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
 /* Zoomable content wrapper inside comparison */
 .comparison-content {
   position: relative;

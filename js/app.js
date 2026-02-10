@@ -19,6 +19,22 @@ App.app = {
     var dom = App.dom;
     [dom.presetWhite, dom.presetBlack, dom.presetCustom].forEach(function(b) { b.classList.remove('active'); });
   },
+
+  updateBrushToolbar: function() {
+    var state = App.state;
+    var dom = App.dom;
+    var hasRasterProcessing = (state.bgRemoval || state.selectedSourceColor) && state.fileType === 'raster';
+    dom.brushToolbar.classList.toggle('active', hasRasterProcessing);
+    dom.btnBrushErase.style.display = state.bgRemoval ? '' : 'none';
+    if (!hasRasterProcessing) {
+      App.bgRemoval.setBrushMode(null);
+      state.brushMask = null;
+      state.undoStack = []; state.redoStack = []; App.zoomPan.updateUndoRedoButtons();
+    }
+    if (!state.bgRemoval && state.brushMode === 'erase') {
+      App.bgRemoval.setBrushMode(null);
+    }
+  },
 };
 
 // ── Init: wire all events ──
@@ -62,6 +78,7 @@ App.app = {
       state.selectedSourceColor = darkest;
       App.colorDetection.highlightSwatch(darkest);
     }
+    App.app.updateBrushToolbar();
     applyProcessing();
   });
 
@@ -84,6 +101,7 @@ App.app = {
       state.selectedSourceColor = lightest;
       App.colorDetection.highlightSwatch(lightest);
     }
+    App.app.updateBrushToolbar();
     applyProcessing();
   });
 
@@ -124,15 +142,10 @@ App.app = {
   dom.bgRemovalToggle.addEventListener('change', function() {
     state.bgRemoval = dom.bgRemovalToggle.checked;
     dom.bgRemovalOptions.classList.toggle('active', state.bgRemoval);
-    dom.brushToolbar.classList.toggle('active', state.bgRemoval && state.fileType === 'raster');
     if (state.bgRemoval && state.fileType === 'raster' && state.originalData) {
       App.bgRemoval.autoDetectBgColor();
     }
-    if (!state.bgRemoval) {
-      App.bgRemoval.setBrushMode(null);
-      state.brushMask = null;
-      state.undoStack = []; state.redoStack = []; App.zoomPan.updateUndoRedoButtons();
-    }
+    App.app.updateBrushToolbar();
     applyProcessing();
   });
 
@@ -406,6 +419,23 @@ App.app = {
     dom.labelBefore.textContent = labels[0];
     dom.labelAfter.textContent = labels[1];
     App.comparison.updateComparisonLayers();
+  });
+
+  // ── Selective mode ──
+  dom.btnSelective.addEventListener('click', function() {
+    state.selectiveMode = !state.selectiveMode;
+    dom.btnSelective.classList.toggle('active', state.selectiveMode);
+    dom.compareModeSelect.style.display = state.selectiveMode ? 'none' : '';
+    if (state.selectiveMode) {
+      // Disable brush mode — it conflicts with selective slider
+      App.bgRemoval.setBrushMode(null);
+      dom.labelBefore.textContent = 'Protected';
+      dom.labelAfter.textContent = 'Processing';
+    } else {
+      var labels = App.comparison.COMPARE_LABELS[state.compareMode] || ['Before', 'After'];
+      dom.labelBefore.textContent = labels[0];
+      dom.labelAfter.textContent = labels[1];
+    }
   });
 
   // ── Comparison slider drag ──

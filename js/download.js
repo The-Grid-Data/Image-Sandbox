@@ -25,8 +25,35 @@ App.download = {
 
   downloadRaster: function() {
     var state = App.state;
-    var canvas = state._brushedCanvas || state.processedCanvas || state.originalCanvas;
-    if (!canvas) return;
+    var processed = state._brushedCanvas || state.processedCanvas || state.originalCanvas;
+    if (!processed) return;
+
+    var canvas;
+    if (state.selectiveMode && state.originalCanvas) {
+      // Composite: left of slider = original, right = processed
+      canvas = document.createElement('canvas');
+      canvas.width = processed.width;
+      canvas.height = processed.height;
+      var ctx = canvas.getContext('2d');
+      var splitX = Math.round(processed.width * state.sliderPos / 100);
+      // Draw original on left side
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, splitX, processed.height);
+      ctx.clip();
+      ctx.drawImage(state.originalCanvas, 0, 0, processed.width, processed.height);
+      ctx.restore();
+      // Draw processed on right side
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(splitX, 0, processed.width - splitX, processed.height);
+      ctx.clip();
+      ctx.drawImage(processed, 0, 0);
+      ctx.restore();
+    } else {
+      canvas = processed;
+    }
+
     canvas.toBlob(function(blob) {
       var baseName = state.fileName.replace(/\.(png|jpg|jpeg|webp|avif|gif|bmp|tiff|tif|ico)$/i, '');
       App.download.downloadBlob(blob, baseName + '_modified.png');

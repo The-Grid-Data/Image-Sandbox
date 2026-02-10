@@ -40,10 +40,13 @@ App.fileHandling = {
     state.undoStack = [];
     state.redoStack = [];
     state.compareMode = 'final';
+    state.selectiveMode = false;
     state._colorOnlyCanvas = null;
     state._bgOnlyCanvas = null;
     state._preUpscaleCanvas = null;
     dom.compareModeSelect.value = 'final';
+    dom.compareModeSelect.style.display = '';
+    dom.btnSelective.classList.remove('active');
     dom.upscaleToggle.checked = false;
     dom.upscaleOptions.classList.remove('active');
     dom.brushToolbar.classList.remove('active');

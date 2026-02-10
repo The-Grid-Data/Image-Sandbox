@@ -93,6 +93,7 @@
   - All event listeners centralized in app.js init function (loaded last via `defer`)
   - Forward references between modules are safe (called at runtime only, not at parse time)
   - Nested functions (walkNode, pixelDist, processChunk, etc.) stay nested in their parent functions
+- Committed as `52d3097` and pushed to GitHub
 - **Pending**: Browser testing for Phase 2 verification (criteria 4, 6-14)
 
 ## File Size Tracking
@@ -100,4 +101,4 @@
 - styles.css: ~943 lines
 - js/ directory: 11 files, ~2000 lines total
 - Total feature count: 16 major features
-- Git commits: 10 on main branch
+- Git commits: 11 on main branch

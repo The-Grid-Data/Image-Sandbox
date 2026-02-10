@@ -16,7 +16,8 @@ window.App = {
     detectedColors: [],
     selectedSourceColor: null,
     targetColor: '#ffffff',
-    tolerance: 50,
+    tolerance: 30,
+    selectiveMode: false,
     bgRemoval: false,
     bgRemovalColor: '#ffffff',
     bgThreshold: 20,
@@ -108,6 +109,7 @@ window.App = {
   d.btnHelp = $('btnHelp');
   d.shortcutsPopover = $('shortcutsPopover');
   d.compareModeSelect = $('compareModeSelect');
+  d.btnSelective = $('btnSelective');
   d.labelBefore = $('labelBefore');
   d.labelAfter = $('labelAfter');
   d.btnDownload = $('btnDownload');

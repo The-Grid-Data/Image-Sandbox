@@ -61,7 +61,7 @@ App.comparison = {
     }
 
     // Re-apply brush mask on the after side if applicable
-    if (state.brushMask && (mode === 'final' || mode === 'bg')) {
+    if (state.brushMask && (mode === 'final' || mode === 'bg' || mode === 'color')) {
       App.bgRemoval.applyBrushToProcessed();
     }
   },

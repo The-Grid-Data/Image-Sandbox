@@ -49,6 +49,7 @@ App.bgRemoval = {
   setBrushMode: function(mode) {
     var state = App.state;
     var dom = App.dom;
+    if (mode !== null && state.selectiveMode) return;
     state.brushMode = mode;
     dom.btnBrushRestore.classList.toggle('active', mode === 'restore');
     dom.btnBrushErase.classList.toggle('active', mode === 'erase');
@@ -430,7 +431,7 @@ App.bgRemoval = {
 
         if (hasColorReplace && a > 0) {
           var dist = Math.sqrt((r - sourceRgb.r)**2 + (g - sourceRgb.g)**2 + (b - sourceRgb.b)**2);
-          var maxDist = tolerance * 4.42;
+          var maxDist = tolerance * 1.5;
           if (dist < maxDist) {
             var blend = 1 - (dist / maxDist);
             r = Math.round(r + (targetRgb.r - r) * blend);
@@ -471,7 +472,7 @@ App.bgRemoval = {
             var r2 = srcData[i2], g2 = srcData[i2+1], b2 = srcData[i2+2], a2 = srcData[i2+3];
             if (a2 > 0) {
               var dist2 = Math.sqrt((r2 - sourceRgb.r)**2 + (g2 - sourceRgb.g)**2 + (b2 - sourceRgb.b)**2);
-              var maxDist2 = tolerance * 4.42;
+              var maxDist2 = tolerance * 1.5;
               if (dist2 < maxDist2) {
                 var blend2 = 1 - (dist2 / maxDist2);
                 r2 = Math.round(r2 + (targetRgb.r - r2) * blend2);

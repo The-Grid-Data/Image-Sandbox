@@ -66,8 +66,8 @@
       <!-- Tolerance (raster only) -->
       <div class="slider-row" id="toleranceRow" style="display:none;">
         <label title="How loosely to match colors — higher values replace more similar shades">Color tolerance:</label>
-        <input type="range" id="toleranceSlider" min="0" max="150" value="50">
-        <span class="slider-value" id="toleranceValue">50</span>
+        <input type="range" id="toleranceSlider" min="0" max="150" value="30">
+        <span class="slider-value" id="toleranceValue">30</span>
       </div>
 
       <!-- Background removal -->
@@ -144,6 +144,7 @@
           <option value="bg">Original vs BG Removed</option>
           <option value="upscale">Pre-upscale vs Upscaled</option>
         </select>
+        <button class="btn-selective" id="btnSelective" title="Use slider to protect areas from processing — left side stays original">Selective</button>
       </div>
       <!-- Brush touchup toolbar (visible when bg removal is on) -->
       <div class="brush-toolbar" id="brushToolbar">
