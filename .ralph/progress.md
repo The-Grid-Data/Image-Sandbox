@@ -96,6 +96,22 @@
 - Committed as `52d3097` and pushed to GitHub
 - **Pending**: Browser testing for Phase 2 verification (criteria 4, 6-14)
 
+### Iteration 4b - Feature Improvements
+- **Task**: Fix color targeting, add brush for color changes, add selective mode
+- **Work completed**:
+  - Fixed color tolerance scaling: `tolerance * 4.42` → `tolerance * 1.5` (was mapping to entire RGB color space)
+  - Changed default tolerance from 50 to 30 for more precise color matching
+  - Extended brush restore tool to work with color replacement (not just bg removal)
+  - Erase button hidden when bg removal is off (alpha-erase meaningless for color-only)
+  - Added `updateBrushToolbar()` helper to centralize brush toolbar visibility logic
+  - Added "Selective" mode: comparison slider becomes processing boundary
+    - Left of slider = protected (original), right = processed
+    - Compare dropdown hidden during selective mode
+    - Download composites both halves at slider position
+    - Brush mode disabled during selective mode (they conflict)
+  - Reset selective mode on file change
+- Committed as `f25f926` and pushed to GitHub
+
 ## File Size Tracking
 - index.html: ~215 lines (down from ~3130)
 - styles.css: ~943 lines
