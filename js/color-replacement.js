@@ -27,11 +27,22 @@ App.colorReplacement = {
     var dom = App.dom;
     var clone = state.svgDoc.documentElement.cloneNode(true);
 
-    var sourceColor = state.selectedSourceColor;
-    var targetColor = state.targetColor;
-
-    if (sourceColor && targetColor) {
-      App.colorReplacement.replaceSVGColors(clone, sourceColor, targetColor);
+    // Apply all accumulated color replacements
+    var replacements = {};
+    var key;
+    for (key in state.colorReplacements) {
+      if (state.colorReplacements.hasOwnProperty(key)) {
+        replacements[key] = state.colorReplacements[key];
+      }
+    }
+    // Include current active selection
+    if (state.selectedSourceColor && state.targetColor) {
+      replacements[state.selectedSourceColor] = state.targetColor;
+    }
+    for (key in replacements) {
+      if (replacements.hasOwnProperty(key) && key !== replacements[key]) {
+        App.colorReplacement.replaceSVGColors(clone, key, replacements[key]);
+      }
     }
 
     if (state.bgRemoval) {

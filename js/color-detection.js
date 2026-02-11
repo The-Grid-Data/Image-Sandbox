@@ -125,7 +125,18 @@ App.colorDetection = {
   selectSourceColor: function(hex, el) {
     var state = App.state;
     var dom = App.dom;
+    // Save current mapping before switching (if there's an active replacement)
+    if (state.selectedSourceColor && state.targetColor &&
+        state.selectedSourceColor !== state.targetColor) {
+      state.colorReplacements[state.selectedSourceColor] = state.targetColor;
+    }
     state.selectedSourceColor = hex;
+    // Restore previous target if this color was already mapped, otherwise keep current
+    if (state.colorReplacements[hex]) {
+      state.targetColor = state.colorReplacements[hex];
+      dom.targetColorInput.value = state.targetColor;
+      dom.targetHexInput.value = state.targetColor;
+    }
     dom.swatchesEl.querySelectorAll('.swatch').forEach(function(s) { s.classList.remove('selected'); });
     el.classList.add('selected');
     dom.targetColorRow.style.display = '';

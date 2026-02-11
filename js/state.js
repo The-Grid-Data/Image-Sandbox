@@ -16,6 +16,7 @@ window.App = {
     detectedColors: [],
     selectedSourceColor: null,
     targetColor: '#ffffff',
+    colorReplacements: {},  // { '#source': '#target', ... } accumulated mappings
     tolerance: 30,
     selectiveMode: false,
     bgRemoval: false,

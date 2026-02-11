@@ -64,6 +64,7 @@ App.app = {
     clearPresetButtons();
     dom.presetWhite.classList.add('active');
     state.presetMode = 'white';
+    state.colorReplacements = {};
     state.targetColor = '#ffffff';
     dom.targetColorInput.value = '#ffffff';
     dom.targetHexInput.value = '#ffffff';
@@ -86,6 +87,7 @@ App.app = {
     clearPresetButtons();
     dom.presetBlack.classList.add('active');
     state.presetMode = 'black';
+    state.colorReplacements = {};
     state.targetColor = '#000000';
     dom.targetColorInput.value = '#000000';
     dom.targetHexInput.value = '#000000';
@@ -109,6 +111,7 @@ App.app = {
     clearPresetButtons();
     dom.presetCustom.classList.add('active');
     state.presetMode = 'custom';
+    state.colorReplacements = {};
     dom.targetColorRow.style.display = '';
     if (state.fileType === 'raster') dom.toleranceRow.style.display = '';
     dom.swatchesSection.style.display = state.detectedColors.length ? '' : 'none';
@@ -118,6 +121,7 @@ App.app = {
   dom.targetColorInput.addEventListener('input', function() {
     state.targetColor = dom.targetColorInput.value;
     dom.targetHexInput.value = dom.targetColorInput.value;
+    if (state.selectedSourceColor) state.colorReplacements[state.selectedSourceColor] = state.targetColor;
     applyProcessing();
   });
 
@@ -127,6 +131,7 @@ App.app = {
     if (/^#[0-9a-fA-F]{6}$/.test(val)) {
       state.targetColor = val.toLowerCase();
       dom.targetColorInput.value = val;
+      if (state.selectedSourceColor) state.colorReplacements[state.selectedSourceColor] = state.targetColor;
       applyProcessing();
     }
   });

@@ -14,6 +14,7 @@ App.fileHandling = {
     state.processedCanvas = null;
     state.detectedColors = [];
     state.selectedSourceColor = null;
+    state.colorReplacements = {};
     state.presetMode = null;
     state.processing = false;
     dom.editor.classList.remove('active');

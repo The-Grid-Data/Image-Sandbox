@@ -231,10 +231,20 @@ App.bgRemoval = {
         var x = p % w;
         var y = (p - x) / w;
 
-        if (x > 0)     { var np = p - 1; if (!visited[np]) { if (isBgPixel(np)) { visited[np] = 1; queue.push(np); } else { visited[np] = 2; } } }
-        if (x < w - 1) { var np2 = p + 1; if (!visited[np2]) { if (isBgPixel(np2)) { visited[np2] = 1; queue.push(np2); } else { visited[np2] = 2; } } }
-        if (y > 0)     { var np3 = p - w; if (!visited[np3]) { if (isBgPixel(np3)) { visited[np3] = 1; queue.push(np3); } else { visited[np3] = 2; } } }
-        if (y < h - 1) { var np4 = p + w; if (!visited[np4]) { if (isBgPixel(np4)) { visited[np4] = 1; queue.push(np4); } else { visited[np4] = 2; } } }
+        // 8-connected: cardinal + diagonal neighbors for smoother edges
+        var neighbors = [];
+        if (x > 0)                     neighbors.push(p - 1);
+        if (x < w - 1)                 neighbors.push(p + 1);
+        if (y > 0)                     neighbors.push(p - w);
+        if (y < h - 1)                 neighbors.push(p + w);
+        if (x > 0 && y > 0)           neighbors.push(p - w - 1);
+        if (x < w - 1 && y > 0)       neighbors.push(p - w + 1);
+        if (x > 0 && y < h - 1)       neighbors.push(p + w - 1);
+        if (x < w - 1 && y < h - 1)   neighbors.push(p + w + 1);
+        for (var ni = 0; ni < neighbors.length; ni++) {
+          var np = neighbors[ni];
+          if (!visited[np]) { if (isBgPixel(np)) { visited[np] = 1; queue.push(np); } else { visited[np] = 2; } }
+        }
       }
       return queue.length;
     }
@@ -268,10 +278,14 @@ App.bgRemoval = {
         var rx = rp % w;
         var ry = (rp - rx) / w;
         var nbs = [];
-        if (rx > 0)     nbs.push(rp - 1);
-        if (rx < w - 1) nbs.push(rp + 1);
-        if (ry > 0)     nbs.push(rp - w);
-        if (ry < h - 1) nbs.push(rp + w);
+        if (rx > 0)                       nbs.push(rp - 1);
+        if (rx < w - 1)                   nbs.push(rp + 1);
+        if (ry > 0)                       nbs.push(rp - w);
+        if (ry < h - 1)                   nbs.push(rp + w);
+        if (rx > 0 && ry > 0)            nbs.push(rp - w - 1);
+        if (rx < w - 1 && ry > 0)        nbs.push(rp - w + 1);
+        if (rx > 0 && ry < h - 1)        nbs.push(rp + w - 1);
+        if (rx < w - 1 && ry < h - 1)    nbs.push(rp + w + 1);
         for (var ni = 0; ni < nbs.length; ni++) {
           var np5 = nbs[ni];
           if (visited[np5] === 0) {
@@ -319,6 +333,52 @@ App.bgRemoval = {
       }
       for (var bi = 0; bi < boundary.length; bi++) {
         out[boundary[bi]] = 1.0;
+      }
+    }
+
+    return out;
+  },
+
+  // Separable Gaussian blur on the mask to feather edges
+  blurMask: function(mask, w, h, radius) {
+    if (radius <= 0) return mask;
+    var totalPixels = w * h;
+    var temp = new Float32Array(totalPixels);
+    var out = new Float32Array(totalPixels);
+
+    // Build 1D Gaussian kernel
+    var size = radius * 2 + 1;
+    var kernel = new Float32Array(size);
+    var sigma = radius / 2.5;
+    var sum = 0;
+    for (var ki = 0; ki < size; ki++) {
+      var d = ki - radius;
+      kernel[ki] = Math.exp(-(d * d) / (2 * sigma * sigma));
+      sum += kernel[ki];
+    }
+    for (var ki2 = 0; ki2 < size; ki2++) kernel[ki2] /= sum;
+
+    // Horizontal pass
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        var val = 0;
+        for (var k = -radius; k <= radius; k++) {
+          var sx = Math.min(w - 1, Math.max(0, x + k));
+          val += mask[y * w + sx] * kernel[k + radius];
+        }
+        temp[y * w + x] = val;
+      }
+    }
+
+    // Vertical pass
+    for (var x2 = 0; x2 < w; x2++) {
+      for (var y2 = 0; y2 < h; y2++) {
+        var val2 = 0;
+        for (var k2 = -radius; k2 <= radius; k2++) {
+          var sy = Math.min(h - 1, Math.max(0, y2 + k2));
+          val2 += temp[sy * w + x2] * kernel[k2 + radius];
+        }
+        out[y2 * w + x2] = val2;
       }
     }
 
@@ -373,9 +433,29 @@ App.bgRemoval = {
 
     outData.set(srcData);
 
-    var hasColorReplace = state.selectedSourceColor && state.targetColor;
-    var sourceRgb = hasColorReplace ? App.utils.hexToRgb(state.selectedSourceColor) : null;
-    var targetRgb = hasColorReplace ? App.utils.hexToRgb(state.targetColor) : null;
+    // Build list of all color replacements (accumulated + current)
+    var replacements = {};
+    var key;
+    for (key in state.colorReplacements) {
+      if (state.colorReplacements.hasOwnProperty(key)) {
+        replacements[key] = state.colorReplacements[key];
+      }
+    }
+    // Include current active selection
+    if (state.selectedSourceColor && state.targetColor) {
+      replacements[state.selectedSourceColor] = state.targetColor;
+    }
+    // Build pre-computed RGB arrays for all replacements
+    var colorPairs = [];
+    for (key in replacements) {
+      if (replacements.hasOwnProperty(key) && key !== replacements[key]) {
+        colorPairs.push({
+          src: App.utils.hexToRgb(key),
+          tgt: App.utils.hexToRgb(replacements[key])
+        });
+      }
+    }
+    var hasColorReplace = colorPairs.length > 0;
     var tolerance = state.tolerance;
     var doBgRemoval = state.bgRemoval;
     var bgThreshold = state.bgThreshold;
@@ -401,6 +481,9 @@ App.bgRemoval = {
         App.utils.showProgress(15, 'Protecting edges...');
         bgMask = App.bgRemoval.erodeMask(bgMask, w, h, state.edgeProtect);
       }
+      // Feather edges with a small Gaussian blur for smoother transitions
+      App.utils.showProgress(18, 'Smoothing edges...');
+      bgMask = App.bgRemoval.blurMask(bgMask, w, h, 2);
     }
 
     var CHUNK = 50000;
@@ -430,13 +513,17 @@ App.bgRemoval = {
         }
 
         if (hasColorReplace && a > 0) {
-          var dist = Math.sqrt((r - sourceRgb.r)**2 + (g - sourceRgb.g)**2 + (b - sourceRgb.b)**2);
           var maxDist = tolerance * 1.5;
-          if (dist < maxDist) {
-            var blend = 1 - (dist / maxDist);
-            r = Math.round(r + (targetRgb.r - r) * blend);
-            g = Math.round(g + (targetRgb.g - g) * blend);
-            b = Math.round(b + (targetRgb.b - b) * blend);
+          for (var ci = 0; ci < colorPairs.length; ci++) {
+            var cp = colorPairs[ci];
+            var dist = Math.sqrt((r - cp.src.r)**2 + (g - cp.src.g)**2 + (b - cp.src.b)**2);
+            if (dist < maxDist) {
+              var blend = 1 - (dist / maxDist);
+              r = Math.round(r + (cp.tgt.r - r) * blend);
+              g = Math.round(g + (cp.tgt.g - g) * blend);
+              b = Math.round(b + (cp.tgt.b - b) * blend);
+              break; // first match wins
+            }
           }
         }
 
@@ -471,13 +558,17 @@ App.bgRemoval = {
             var i2 = p2 * 4;
             var r2 = srcData[i2], g2 = srcData[i2+1], b2 = srcData[i2+2], a2 = srcData[i2+3];
             if (a2 > 0) {
-              var dist2 = Math.sqrt((r2 - sourceRgb.r)**2 + (g2 - sourceRgb.g)**2 + (b2 - sourceRgb.b)**2);
               var maxDist2 = tolerance * 1.5;
-              if (dist2 < maxDist2) {
-                var blend2 = 1 - (dist2 / maxDist2);
-                r2 = Math.round(r2 + (targetRgb.r - r2) * blend2);
-                g2 = Math.round(g2 + (targetRgb.g - g2) * blend2);
-                b2 = Math.round(b2 + (targetRgb.b - b2) * blend2);
+              for (var ci2 = 0; ci2 < colorPairs.length; ci2++) {
+                var cp2 = colorPairs[ci2];
+                var dist2 = Math.sqrt((r2 - cp2.src.r)**2 + (g2 - cp2.src.g)**2 + (b2 - cp2.src.b)**2);
+                if (dist2 < maxDist2) {
+                  var blend2 = 1 - (dist2 / maxDist2);
+                  r2 = Math.round(r2 + (cp2.tgt.r - r2) * blend2);
+                  g2 = Math.round(g2 + (cp2.tgt.g - g2) * blend2);
+                  b2 = Math.round(b2 + (cp2.tgt.b - b2) * blend2);
+                  break;
+                }
               }
             }
             cData[i2] = r2; cData[i2+1] = g2; cData[i2+2] = b2; cData[i2+3] = a2;
