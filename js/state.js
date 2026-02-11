@@ -118,4 +118,14 @@ window.App = {
   d.progressFill = $('progressFill');
   d.progressText = $('progressText');
   d.toastContainer = $('toastContainer');
+  d.btnHelpMain = $('btnHelpMain');
+  d.helpPanel = $('helpPanel');
+  d.helpPanelClose = $('helpPanelClose');
+  d.tourOverlay = $('tourOverlay');
+  d.tourTooltip = $('tourTooltip');
+  d.tourContent = $('tourContent');
+  d.tourProgress = $('tourProgress');
+  d.tourSkip = $('tourSkip');
+  d.tourBack = $('tourBack');
+  d.tourNext = $('tourNext');
 })();

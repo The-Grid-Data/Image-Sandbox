@@ -466,4 +466,19 @@ App.app = {
       App.download.downloadRaster();
     }
   });
+
+  // ── Help panel ──
+  dom.btnHelpMain.addEventListener('click', function() { App.tutorial.openHelp(); });
+  dom.helpPanelClose.addEventListener('click', function() { App.tutorial.closeHelp(); });
+
+  // ── Guided tour ──
+  dom.tourNext.addEventListener('click', function() { App.tutorial.nextStep(); });
+  dom.tourBack.addEventListener('click', function() { App.tutorial.prevStep(); });
+  dom.tourSkip.addEventListener('click', function() { App.tutorial.endTour(); });
+  dom.tourOverlay.addEventListener('click', function() { App.tutorial.endTour(); });
+
+  // Auto-start tour on first visit
+  if (App.tutorial.shouldShowTour()) {
+    App.tutorial.startTour();
+  }
 })();

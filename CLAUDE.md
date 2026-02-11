@@ -54,11 +54,12 @@ js/
   color-detection.js   — detectSVGColors, detectRasterColors, renderSwatches
   file-handling.js     — handleFile, loadSVG, loadRaster, resetState
   download.js          — downloadSVG, downloadRaster, downloadBlob
+  tutorial.js          — guided tour (first use) + help panel
   app.js               — applyProcessing dispatcher, event wiring (loaded last)
 ```
 
 ### Script Load Order (all `defer`)
-state.js → utils.js → comparison.js → zoom-pan.js → upscale.js → bg-removal.js → color-replacement.js → color-detection.js → file-handling.js → download.js → app.js
+state.js → utils.js → comparison.js → zoom-pan.js → upscale.js → bg-removal.js → color-replacement.js → color-detection.js → file-handling.js → download.js → tutorial.js → app.js
 
 ### Namespace Pattern
 - `window.App` created in state.js
