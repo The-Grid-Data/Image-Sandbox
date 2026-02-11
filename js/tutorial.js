@@ -80,15 +80,11 @@ App.tutorial = {
     var step = TOUR_STEPS[_tourStep];
     if (!step) { App.tutorial.endTour(); return; }
 
-    // Remove previous highlight
-    var prev = document.querySelector('.tour-highlight');
-    if (prev) prev.classList.remove('tour-highlight');
-
     // Find target element
     var target = document.getElementById(step.target);
-    if (target) {
-      target.classList.add('tour-highlight');
-    }
+
+    // Apply clip-path cutout on overlay so the target shows through
+    App.tutorial._applyCutout(target);
 
     // Set content
     dom.tourContent.innerHTML = step.content;
@@ -194,10 +190,57 @@ App.tutorial = {
     _tourWaiting = false;
     dom.tourOverlay.classList.remove('visible');
     dom.tourOverlay.style.pointerEvents = '';
+    dom.tourOverlay.style.clipPath = '';
     dom.tourTooltip.classList.remove('visible');
-    var prev = document.querySelector('.tour-highlight');
-    if (prev) prev.classList.remove('tour-highlight');
+    // Remove highlight ring if present
+    var ring = document.querySelector('.tour-ring');
+    if (ring) ring.remove();
     try { localStorage.setItem('imageSandbox_tourDone', '1'); } catch(e) {}
+  },
+
+  // Cut a rectangular hole in the overlay so the target element is visible
+  _applyCutout: function(target) {
+    var overlay = App.dom.tourOverlay;
+
+    // Remove previous ring
+    var oldRing = document.querySelector('.tour-ring');
+    if (oldRing) oldRing.remove();
+
+    if (!target) {
+      overlay.style.clipPath = '';
+      return;
+    }
+
+    var pad = 6;
+    var rect = target.getBoundingClientRect();
+    var x = rect.left - pad;
+    var y = rect.top - pad;
+    var w = rect.width + pad * 2;
+    var h = rect.height + pad * 2;
+    var r = 6; // border-radius for the cutout
+
+    // clip-path: polygon that covers the full viewport with a rectangular hole
+    // Using evenodd fill rule via clip-path with an inset path approach:
+    // Outer rect (full screen) + inner rect (hole) wound in opposite direction
+    var vw = '100vw';
+    var vh = '100vh';
+    var path = 'polygon(evenodd, ' +
+      // Outer rectangle (clockwise)
+      '0 0, ' + vw + ' 0, ' + vw + ' ' + vh + ', 0 ' + vh + ', 0 0, ' +
+      // Inner rectangle (counter-clockwise = hole)
+      x + 'px ' + y + 'px, ' +
+      x + 'px ' + (y + h) + 'px, ' +
+      (x + w) + 'px ' + (y + h) + 'px, ' +
+      (x + w) + 'px ' + y + 'px, ' +
+      x + 'px ' + y + 'px' +
+    ')';
+    overlay.style.clipPath = path;
+
+    // Add a visible ring around the target (separate element, fixed-position)
+    var ring = document.createElement('div');
+    ring.className = 'tour-ring';
+    ring.style.cssText = 'position:fixed;top:' + y + 'px;left:' + x + 'px;width:' + w + 'px;height:' + h + 'px;z-index:905;pointer-events:none;';
+    document.body.appendChild(ring);
   },
 
   shouldShowTour: function() {

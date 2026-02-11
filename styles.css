@@ -1132,9 +1132,8 @@ body {
 .tour-btn-next:hover { background: var(--accent-hover); }
 .tour-btn-skip { border: none; background: none; color: var(--text-muted); }
 .tour-btn-skip:hover { color: var(--text-primary); }
-.tour-highlight {
-  position: relative;
-  z-index: 910;
-  box-shadow: 0 0 0 4px rgba(168,85,247,0.4);
+/* Highlight ring — positioned over target via JS (avoids stacking context issues) */
+.tour-ring {
   border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 3px rgba(168,85,247,0.6), 0 0 20px rgba(168,85,247,0.25);
 }
