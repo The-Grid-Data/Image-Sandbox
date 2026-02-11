@@ -72,8 +72,9 @@ App.tutorial = {
 
   // ── Guided tour ──
   startTour: function() {
-    _tourStep = 0;
     _tourWaiting = false;
+    // If an image is already loaded, skip the "upload" step
+    _tourStep = App.state.fileType ? 1 : 0;
     App.tutorial.showStep();
   },
 
