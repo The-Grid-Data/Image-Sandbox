@@ -3,6 +3,7 @@
 
 var _tourStep = 0;
 var _tourWaiting = false; // true when paused waiting for image upload
+var _revealedEl = null;   // element temporarily shown for the current step
 
 var TOUR_STEPS = [
   {
@@ -18,8 +19,8 @@ var TOUR_STEPS = [
   },
   {
     target: 'toleranceRow',
-    fallback: 'controlsPanel',
-    content: '<strong>Color Tolerance</strong><br>After selecting a color, a tolerance slider appears here. It controls how many similar shades get changed. Start low and increase until you get the result you want.',
+    reveal: true,
+    content: '<strong>Color Tolerance</strong><br>This slider appears when you select a source color on a raster image (PNG, JPG, etc.). It controls how many similar shades get changed. Start low and increase until you get the result you want. <em>SVG files don\'t need this — colors are matched exactly.</em>',
     position: 'bottom'
   },
   {
@@ -29,8 +30,8 @@ var TOUR_STEPS = [
   },
   {
     target: 'brushToolbar',
-    fallback: 'previewPanel',
-    content: '<strong>Brush Touchup</strong><br>After changing colors or removing the background, a toolbar appears here. Use <strong>Restore</strong> to bring back areas, or <strong>Erase</strong> to remove more. Ctrl+Z to undo.',
+    reveal: true,
+    content: '<strong>Brush Touchup</strong><br>This toolbar appears after you change colors or remove the background. Use <strong>Restore</strong> to bring back areas, or <strong>Erase</strong> to remove more. Ctrl+Z to undo.',
     position: 'bottom'
   },
   {
@@ -82,6 +83,24 @@ App.tutorial = {
     var dom = App.dom;
     var step = TOUR_STEPS[_tourStep];
     if (!step) { App.tutorial.endTour(); return; }
+
+    // Hide any element that was temporarily revealed for the previous step
+    App.tutorial._hideRevealed();
+
+    // If this step has reveal:true, temporarily force-show the target
+    var primary = document.getElementById(step.target);
+    if (step.reveal && primary && !App.tutorial._isVisible(primary)) {
+      // For elements hidden with inline style (e.g. toleranceRow)
+      if (primary.style.display === 'none') {
+        primary.style.display = '';
+        _revealedEl = { el: primary, method: 'inline' };
+      }
+      // For elements hidden via CSS class (e.g. brushToolbar needs .active)
+      else if (window.getComputedStyle(primary).display === 'none') {
+        primary.classList.add('active');
+        _revealedEl = { el: primary, method: 'class', cls: 'active' };
+      }
+    }
 
     // Resolve visible target: try primary, then fallback
     var target = App.tutorial._resolveTarget(step);
@@ -204,6 +223,8 @@ App.tutorial = {
   endTour: function() {
     var dom = App.dom;
     _tourWaiting = false;
+    // Re-hide any temporarily revealed element
+    App.tutorial._hideRevealed();
     dom.tourOverlay.classList.remove('visible');
     dom.tourOverlay.style.pointerEvents = '';
     dom.tourOverlay.style.clipPath = '';
@@ -214,6 +235,17 @@ App.tutorial = {
     // Unlock page scroll
     document.body.style.overflow = '';
     try { localStorage.setItem('imageSandbox_tourDone', '1'); } catch(e) {}
+  },
+
+  // Re-hide an element that was temporarily shown for a tour step
+  _hideRevealed: function() {
+    if (!_revealedEl) return;
+    if (_revealedEl.method === 'inline') {
+      _revealedEl.el.style.display = 'none';
+    } else if (_revealedEl.method === 'class') {
+      _revealedEl.el.classList.remove(_revealedEl.cls);
+    }
+    _revealedEl = null;
   },
 
   // Check if an element is visible and has dimensions
