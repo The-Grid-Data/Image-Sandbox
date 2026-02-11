@@ -1,13 +1,15 @@
-// js/tutorial.js — Guided tour and help panel
+// js/tutorial.js — Guided tour (first use) + help panel
 'use strict';
 
 var _tourStep = 0;
+var _tourWaiting = false; // true when paused waiting for image upload
 
 var TOUR_STEPS = [
   {
     target: 'dropZone',
     content: '<strong>Step 1: Upload your image</strong><br>Drag and drop a file here, or click to browse. Supports SVG, PNG, JPG, WebP, and more.',
-    position: 'bottom'
+    position: 'bottom',
+    waitForFile: true  // pause here until user uploads an image
   },
   {
     target: 'controlsPanel',
@@ -17,8 +19,7 @@ var TOUR_STEPS = [
   {
     target: 'toleranceRow',
     content: '<strong>Color Tolerance</strong><br>This slider controls how many similar shades get changed. Start low (exact match) and increase until you get the result you want.',
-    position: 'bottom',
-    showWhenHidden: true
+    position: 'bottom'
   },
   {
     target: 'bgRemovalToggle',
@@ -28,8 +29,7 @@ var TOUR_STEPS = [
   {
     target: 'brushToolbar',
     content: '<strong>Brush Touchup</strong><br>After processing, use <strong>Restore</strong> to bring back areas you want to keep, or <strong>Erase</strong> to remove more background. Ctrl+Z to undo.',
-    position: 'bottom',
-    showAlways: true
+    position: 'bottom'
   },
   {
     target: 'compareModeSelect',
@@ -71,6 +71,7 @@ App.tutorial = {
   // ── Guided tour ──
   startTour: function() {
     _tourStep = 0;
+    _tourWaiting = false;
     App.tutorial.showStep();
   },
 
@@ -96,8 +97,13 @@ App.tutorial = {
     // Show/hide back button
     dom.tourBack.style.display = _tourStep === 0 ? 'none' : '';
 
-    // Change next button text on last step
-    dom.tourNext.textContent = _tourStep === TOUR_STEPS.length - 1 ? 'Finish' : 'Next';
+    // If this step waits for file upload, change Next button text
+    if (step.waitForFile) {
+      dom.tourNext.style.display = 'none';
+    } else {
+      dom.tourNext.style.display = '';
+      dom.tourNext.textContent = _tourStep === TOUR_STEPS.length - 1 ? 'Finish' : 'Next';
+    }
 
     // Show overlay and tooltip
     dom.tourOverlay.classList.add('visible');
@@ -105,12 +111,33 @@ App.tutorial = {
 
     // Position tooltip near target
     App.tutorial.positionTooltip(target, step.position);
+
+    // If waiting for file, mark as paused so click-through works
+    if (step.waitForFile) {
+      _tourWaiting = true;
+      // Let clicks pass through overlay to the drop zone
+      dom.tourOverlay.style.pointerEvents = 'none';
+    } else {
+      _tourWaiting = false;
+      dom.tourOverlay.style.pointerEvents = '';
+    }
+  },
+
+  // Called by file-handling.js showEditor() when an image is loaded
+  resumeTour: function() {
+    if (!_tourWaiting) return;
+    _tourWaiting = false;
+    App.dom.tourOverlay.style.pointerEvents = '';
+    // Small delay so the editor has time to render before positioning tooltips
+    setTimeout(function() {
+      _tourStep++;
+      App.tutorial.showStep();
+    }, 400);
   },
 
   positionTooltip: function(target, position) {
     var tooltip = App.dom.tourTooltip;
     if (!target) {
-      // Center on screen if no target
       tooltip.style.top = '50%';
       tooltip.style.left = '50%';
       tooltip.style.transform = 'translate(-50%, -50%)';
@@ -164,7 +191,9 @@ App.tutorial = {
 
   endTour: function() {
     var dom = App.dom;
+    _tourWaiting = false;
     dom.tourOverlay.classList.remove('visible');
+    dom.tourOverlay.style.pointerEvents = '';
     dom.tourTooltip.classList.remove('visible');
     var prev = document.querySelector('.tour-highlight');
     if (prev) prev.classList.remove('tour-highlight');

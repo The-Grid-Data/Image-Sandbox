@@ -160,5 +160,6 @@ App.fileHandling = {
     dom.dropZone.style.display = 'none';
     dom.editor.classList.add('active');
     App.download.updateDownloadInfo();
+    App.tutorial.resumeTour();
   },
 };
