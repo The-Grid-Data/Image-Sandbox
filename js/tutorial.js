@@ -128,8 +128,10 @@ App.tutorial = {
       // Show/hide back button
       dom.tourBack.style.display = _tourStep === 0 ? 'none' : '';
 
-      // If this step waits for file upload, change Next button text
-      if (step.waitForFile) {
+      // Only actually wait for file if no file is loaded yet
+      var needsWait = step.waitForFile && !App.state.fileType;
+
+      if (needsWait) {
         dom.tourNext.style.display = 'none';
       } else {
         dom.tourNext.style.display = '';
@@ -144,7 +146,7 @@ App.tutorial = {
       App.tutorial.positionTooltip(target, step.position);
 
       // If waiting for file, mark as paused so click-through works
-      if (step.waitForFile) {
+      if (needsWait) {
         _tourWaiting = true;
         dom.tourOverlay.style.pointerEvents = 'none';
       } else {
