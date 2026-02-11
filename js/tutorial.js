@@ -86,6 +86,9 @@ App.tutorial = {
     // Resolve visible target: try primary, then fallback
     var target = App.tutorial._resolveTarget(step);
 
+    // Temporarily unlock scroll so scrollIntoView can work
+    document.body.style.overflow = '';
+
     // Scroll target into view so off-screen elements are visible
     if (target) {
       target.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -93,6 +96,9 @@ App.tutorial = {
 
     // Brief delay so scroll settles before measuring positions
     setTimeout(function() {
+      // Lock page scroll now that scrollIntoView has settled
+      document.body.style.overflow = 'hidden';
+
       // Apply clip-path cutout on overlay so the target shows through
       App.tutorial._applyCutout(target);
 
@@ -205,6 +211,8 @@ App.tutorial = {
     // Remove highlight ring if present
     var ring = document.querySelector('.tour-ring');
     if (ring) ring.remove();
+    // Unlock page scroll
+    document.body.style.overflow = '';
     try { localStorage.setItem('imageSandbox_tourDone', '1'); } catch(e) {}
   },
 
