@@ -165,28 +165,33 @@ App.colorDetection = {
       el.title = hex;
       var lum = App.utils.luminance(App.utils.hexToRgb(hex));
       var checkColor = lum > 0.5 ? '#000' : '#fff';
+      var isSelected = (hex === state.selectedSourceColor);
+      var mappedTarget = effective[hex];
+      var showCheck = isSelected || !!mappedTarget;
 
-      // Check mark — shown on ALL mapped swatches + the currently selected one
-      el.innerHTML = '<span class="swatch-check" style="color:' + checkColor + '">&#10003;</span>';
+      // Check mark — force visible with inline style for mapped/selected swatches
+      var checkStyle = 'color:' + checkColor + ';position:absolute;inset:0;align-items:center;justify-content:center;font-size:14px;font-weight:bold;text-shadow:0 1px 2px rgba(0,0,0,0.5);z-index:1;';
+      checkStyle += showCheck ? 'display:flex;' : 'display:none;';
+      el.innerHTML = '<span style="' + checkStyle + '">&#10003;</span>';
 
       // Show split-color visual if this color is mapped
-      var mappedTarget = effective[hex];
       if (mappedTarget) {
         el.classList.add('mapped');
+        el.style.borderColor = 'var(--accent, #a855f7)';
+        el.style.overflow = 'visible';
 
-        // Right half showing target color
+        // Right half showing target color (inline styled)
         var targetHalf = document.createElement('span');
-        targetHalf.className = 'swatch-target-half';
-        targetHalf.style.background = mappedTarget;
+        targetHalf.style.cssText = 'position:absolute;top:0;right:0;width:50%;height:100%;border-radius:0 4px 4px 0;pointer-events:none;background:' + mappedTarget;
         el.appendChild(targetHalf);
 
-        // Arrow label below
+        // Arrow label below (inline styled)
         var arrow = document.createElement('span');
-        arrow.className = 'swatch-arrow';
+        arrow.style.cssText = 'position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);font-size:8px;color:#94a3b8;pointer-events:none;white-space:nowrap;';
         arrow.textContent = '\u2192' + mappedTarget;
         el.appendChild(arrow);
 
-        // Remove button (visible on hover for saved mappings only)
+        // Remove button (visible on hover for saved mappings)
         if (state.colorReplacements[hex]) {
           var removeBtn = document.createElement('span');
           removeBtn.className = 'swatch-remove';
@@ -202,14 +207,9 @@ App.colorDetection = {
         }
       }
 
-      // Mark as "selected" (border highlight) for the actively-editing swatch
-      if (hex === state.selectedSourceColor) {
+      // Mark selected swatch with extra highlight
+      if (isSelected) {
         el.classList.add('selected');
-      }
-
-      // Show checkmark on ALL mapped swatches (multi-select visual) AND the active one
-      if (mappedTarget || hex === state.selectedSourceColor) {
-        el.classList.add('checked');
       }
 
       // Click handler: select or deselect
@@ -220,7 +220,7 @@ App.colorDetection = {
       dom.swatchesEl.appendChild(el);
     }
 
-    // Update summary
+    // Update summary row (undo button + reset + count)
     App.colorDetection.updateSummary();
   },
 
@@ -306,6 +306,7 @@ App.colorDetection = {
   updateSummary: function() {
     var state = App.state;
     var dom = App.dom;
+    if (!dom.swatchesSummary || !dom.mappingCount || !dom.btnColorUndo || !dom.btnResetColors) return;
     var count = 0;
     var key;
     for (key in state.colorReplacements) {
@@ -316,7 +317,7 @@ App.colorDetection = {
     // Show summary row when there are mappings OR undo history
     var hasUndo = state.colorUndoStack.length > 0;
     if (count > 0 || hasUndo) {
-      dom.swatchesSummary.style.display = '';
+      dom.swatchesSummary.style.display = 'flex';
       dom.mappingCount.textContent = count > 0 ? count + ' color' + (count > 1 ? 's' : '') + ' changed' : '';
       dom.btnResetColors.style.display = count > 0 ? '' : 'none';
     } else {
