@@ -18,7 +18,8 @@ var TOUR_STEPS = [
   },
   {
     target: 'toleranceRow',
-    content: '<strong>Color Tolerance</strong><br>This slider controls how many similar shades get changed. Start low (exact match) and increase until you get the result you want.',
+    fallback: 'controlsPanel',
+    content: '<strong>Color Tolerance</strong><br>After selecting a color, a tolerance slider appears here. It controls how many similar shades get changed. Start low and increase until you get the result you want.',
     position: 'bottom'
   },
   {
@@ -28,7 +29,8 @@ var TOUR_STEPS = [
   },
   {
     target: 'brushToolbar',
-    content: '<strong>Brush Touchup</strong><br>After processing, use <strong>Restore</strong> to bring back areas you want to keep, or <strong>Erase</strong> to remove more background. Ctrl+Z to undo.',
+    fallback: 'previewPanel',
+    content: '<strong>Brush Touchup</strong><br>After changing colors or removing the background, a toolbar appears here. Use <strong>Restore</strong> to bring back areas, or <strong>Erase</strong> to remove more. Ctrl+Z to undo.',
     position: 'bottom'
   },
   {
@@ -80,43 +82,50 @@ App.tutorial = {
     var step = TOUR_STEPS[_tourStep];
     if (!step) { App.tutorial.endTour(); return; }
 
-    // Find target element
-    var target = document.getElementById(step.target);
+    // Resolve visible target: try primary, then fallback
+    var target = App.tutorial._resolveTarget(step);
 
-    // Apply clip-path cutout on overlay so the target shows through
-    App.tutorial._applyCutout(target);
-
-    // Set content
-    dom.tourContent.innerHTML = step.content;
-    dom.tourProgress.textContent = (_tourStep + 1) + ' of ' + TOUR_STEPS.length;
-
-    // Show/hide back button
-    dom.tourBack.style.display = _tourStep === 0 ? 'none' : '';
-
-    // If this step waits for file upload, change Next button text
-    if (step.waitForFile) {
-      dom.tourNext.style.display = 'none';
-    } else {
-      dom.tourNext.style.display = '';
-      dom.tourNext.textContent = _tourStep === TOUR_STEPS.length - 1 ? 'Finish' : 'Next';
+    // Scroll target into view so off-screen elements are visible
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
-    // Show overlay and tooltip
-    dom.tourOverlay.classList.add('visible');
-    dom.tourTooltip.classList.add('visible');
+    // Brief delay so scroll settles before measuring positions
+    setTimeout(function() {
+      // Apply clip-path cutout on overlay so the target shows through
+      App.tutorial._applyCutout(target);
 
-    // Position tooltip near target
-    App.tutorial.positionTooltip(target, step.position);
+      // Set content
+      dom.tourContent.innerHTML = step.content;
+      dom.tourProgress.textContent = (_tourStep + 1) + ' of ' + TOUR_STEPS.length;
 
-    // If waiting for file, mark as paused so click-through works
-    if (step.waitForFile) {
-      _tourWaiting = true;
-      // Let clicks pass through overlay to the drop zone
-      dom.tourOverlay.style.pointerEvents = 'none';
-    } else {
-      _tourWaiting = false;
-      dom.tourOverlay.style.pointerEvents = '';
-    }
+      // Show/hide back button
+      dom.tourBack.style.display = _tourStep === 0 ? 'none' : '';
+
+      // If this step waits for file upload, change Next button text
+      if (step.waitForFile) {
+        dom.tourNext.style.display = 'none';
+      } else {
+        dom.tourNext.style.display = '';
+        dom.tourNext.textContent = _tourStep === TOUR_STEPS.length - 1 ? 'Finish' : 'Next';
+      }
+
+      // Show overlay and tooltip
+      dom.tourOverlay.classList.add('visible');
+      dom.tourTooltip.classList.add('visible');
+
+      // Position tooltip near target
+      App.tutorial.positionTooltip(target, step.position);
+
+      // If waiting for file, mark as paused so click-through works
+      if (step.waitForFile) {
+        _tourWaiting = true;
+        dom.tourOverlay.style.pointerEvents = 'none';
+      } else {
+        _tourWaiting = false;
+        dom.tourOverlay.style.pointerEvents = '';
+      }
+    }, target ? 300 : 0);
   },
 
   // Called by file-handling.js showEditor() when an image is loaded
@@ -196,6 +205,26 @@ App.tutorial = {
     var ring = document.querySelector('.tour-ring');
     if (ring) ring.remove();
     try { localStorage.setItem('imageSandbox_tourDone', '1'); } catch(e) {}
+  },
+
+  // Check if an element is visible and has dimensions
+  _isVisible: function(el) {
+    if (!el) return false;
+    var rect = el.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return false;
+    var style = window.getComputedStyle(el);
+    return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+  },
+
+  // Resolve which element to highlight: primary target if visible, else fallback
+  _resolveTarget: function(step) {
+    var primary = document.getElementById(step.target);
+    if (App.tutorial._isVisible(primary)) return primary;
+    if (step.fallback) {
+      var fb = document.getElementById(step.fallback);
+      if (App.tutorial._isVisible(fb)) return fb;
+    }
+    return null;
   },
 
   // Cut a rectangular hole in the overlay so the target element is visible
