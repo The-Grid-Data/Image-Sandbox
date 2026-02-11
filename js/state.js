@@ -132,6 +132,7 @@ window.App = {
   d.tourNext = $('tourNext');
   d.swatchesSummary = $('swatchesSummary');
   d.mappingCount = $('mappingCount');
+  d.btnColorUndo = $('btnColorUndo');
   d.btnResetColors = $('btnResetColors');
   d.btnRestartTour = $('btnRestartTour');
   d.btnHelpTour = $('btnHelpTour');

@@ -524,7 +524,8 @@ App.app = {
   dom.btnRestartTour.addEventListener('click', function() { App.tutorial.restartTour(); });
   dom.btnHelpTour.addEventListener('click', function() { App.tutorial.restartTour(); });
 
-  // ── Reset all colors ──
+  // ── Color undo + Reset all colors ──
+  dom.btnColorUndo.addEventListener('click', function() { App.colorDetection.undoColor(); });
   dom.btnResetColors.addEventListener('click', function() { App.colorDetection.resetAllColors(); });
 
   // Auto-start tour on first visit

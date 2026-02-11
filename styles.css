@@ -254,7 +254,8 @@ body {
   text-shadow: 0 1px 2px rgba(0,0,0,0.5);
 }
 
-.swatch.selected .swatch-check {
+.swatch.selected .swatch-check,
+.swatch.checked .swatch-check {
   display: flex;
 }
 
@@ -321,6 +322,22 @@ body {
   font-size: 11px;
   color: var(--accent);
   font-weight: 500;
+}
+
+/* Color undo button */
+.btn-color-undo {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.btn-color-undo:hover {
+  background: rgba(168, 85, 247, 0.15);
 }
 
 /* Reset all colors button */

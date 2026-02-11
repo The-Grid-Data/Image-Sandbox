@@ -166,7 +166,7 @@ App.colorDetection = {
       var lum = App.utils.luminance(App.utils.hexToRgb(hex));
       var checkColor = lum > 0.5 ? '#000' : '#fff';
 
-      // Check mark (shown when selected)
+      // Check mark — shown on ALL mapped swatches + the currently selected one
       el.innerHTML = '<span class="swatch-check" style="color:' + checkColor + '">&#10003;</span>';
 
       // Show split-color visual if this color is mapped
@@ -202,9 +202,14 @@ App.colorDetection = {
         }
       }
 
-      // Mark selected
+      // Mark as "selected" (border highlight) for the actively-editing swatch
       if (hex === state.selectedSourceColor) {
         el.classList.add('selected');
+      }
+
+      // Show checkmark on ALL mapped swatches (multi-select visual) AND the active one
+      if (mappedTarget || hex === state.selectedSourceColor) {
+        el.classList.add('checked');
       }
 
       // Click handler: select or deselect
@@ -297,7 +302,7 @@ App.colorDetection = {
     App.utils.showToast('All color changes cleared');
   },
 
-  // Update the summary row showing mapping count + reset button
+  // Update the summary row showing mapping count + undo/reset buttons
   updateSummary: function() {
     var state = App.state;
     var dom = App.dom;
@@ -308,12 +313,18 @@ App.colorDetection = {
         count++;
       }
     }
-    if (count > 0) {
+    // Show summary row when there are mappings OR undo history
+    var hasUndo = state.colorUndoStack.length > 0;
+    if (count > 0 || hasUndo) {
       dom.swatchesSummary.style.display = '';
-      dom.mappingCount.textContent = count + ' color' + (count > 1 ? 's' : '') + ' changed';
+      dom.mappingCount.textContent = count > 0 ? count + ' color' + (count > 1 ? 's' : '') + ' changed' : '';
+      dom.btnResetColors.style.display = count > 0 ? '' : 'none';
     } else {
       dom.swatchesSummary.style.display = 'none';
     }
+    // Update undo button state
+    dom.btnColorUndo.style.opacity = hasUndo ? '1' : '0.4';
+    dom.btnColorUndo.style.pointerEvents = hasUndo ? '' : 'none';
   },
 
   highlightSwatch: function(hex) {
