@@ -477,6 +477,10 @@ App.app = {
   dom.tourSkip.addEventListener('click', function() { App.tutorial.endTour(); });
   dom.tourOverlay.addEventListener('click', function() { App.tutorial.endTour(); });
 
+  // Restart tour buttons (footer + help panel)
+  dom.btnRestartTour.addEventListener('click', function() { App.tutorial.restartTour(); });
+  dom.btnHelpTour.addEventListener('click', function() { App.tutorial.restartTour(); });
+
   // Auto-start tour on first visit
   if (App.tutorial.shouldShowTour()) {
     App.tutorial.startTour();

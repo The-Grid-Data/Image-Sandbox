@@ -128,4 +128,6 @@ window.App = {
   d.tourSkip = $('tourSkip');
   d.tourBack = $('tourBack');
   d.tourNext = $('tourNext');
+  d.btnRestartTour = $('btnRestartTour');
+  d.btnHelpTour = $('btnHelpTour');
 })();

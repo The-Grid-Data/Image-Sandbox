@@ -202,5 +202,12 @@ App.tutorial = {
 
   shouldShowTour: function() {
     try { return !localStorage.getItem('imageSandbox_tourDone'); } catch(e) { return false; }
+  },
+
+  restartTour: function() {
+    try { localStorage.removeItem('imageSandbox_tourDone'); } catch(e) {}
+    // Close help panel if open
+    App.tutorial.closeHelp();
+    App.tutorial.startTour();
   }
 };

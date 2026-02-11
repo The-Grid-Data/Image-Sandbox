@@ -1039,6 +1039,45 @@ body {
 .help-panel-body details p:first-of-type { padding-top: 10px; }
 .help-panel-body details p:last-of-type { padding-bottom: 10px; }
 
+/* Help panel — restart tour link */
+.help-tour-link {
+  padding: 16px 14px 8px;
+  text-align: center;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+.btn-help-tour {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.btn-help-tour:hover { background: var(--accent); color: #fff; }
+
+/* ── Footer — restart tour ── */
+.footer {
+  text-align: center;
+  padding: 18px 0 24px;
+}
+.btn-restart-tour {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 20px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.btn-restart-tour:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* ── Guided tour ── */
 .tour-overlay {
   display: none;
