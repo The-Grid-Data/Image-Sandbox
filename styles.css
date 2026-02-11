@@ -219,8 +219,9 @@ body {
 
 .swatches {
   display: flex;
-  gap: 6px;
+  gap: 8px 6px;
   flex-wrap: wrap;
+  padding-bottom: 16px;
 }
 
 .swatch {
@@ -257,54 +258,74 @@ body {
   display: flex;
 }
 
-/* Mapped swatch indicator — small dot showing target color */
-.swatch-mapped-dot {
-  position: absolute;
-  bottom: -3px;
-  right: -3px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid var(--bg-primary);
-  pointer-events: none;
-  z-index: 1;
-}
-
+/* Mapped swatch — diagonal split showing original→target */
 .swatch.mapped {
-  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.4);
+  border-color: var(--accent);
+  overflow: visible;
 }
 
-.swatch.mapped.selected {
-  box-shadow: 0 0 0 2px var(--accent-dim);
+.swatch-arrow {
+  position: absolute;
+  bottom: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  color: var(--text-secondary);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.swatch-target-half {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 50%;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  pointer-events: none;
 }
 
 /* Remove mapping badge (appears on hover for mapped swatches) */
 .swatch-remove {
   display: none;
   position: absolute;
-  top: -6px;
-  left: -6px;
+  top: -7px;
+  right: -7px;
   width: 16px;
   height: 16px;
   border-radius: 50%;
   background: #ef4444;
   color: #fff;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 16px;
   text-align: center;
   cursor: pointer;
   z-index: 2;
   pointer-events: auto;
+  font-weight: bold;
 }
 
 .swatch.mapped:hover .swatch-remove {
   display: block;
 }
 
+/* Color mapping summary */
+.swatches-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.mapping-count {
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 500;
+}
+
 /* Reset all colors button */
 .btn-reset-colors {
-  margin-top: 8px;
-  padding: 5px 12px;
+  padding: 4px 10px;
   border-radius: var(--radius-sm);
   border: 1px solid #ef4444;
   background: transparent;

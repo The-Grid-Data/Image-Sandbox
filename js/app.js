@@ -80,7 +80,7 @@ App.app = {
       state.selectedSourceColor = darkest;
       App.colorDetection.renderSwatches();
     }
-    App.colorDetection.updateResetButton();
+    App.colorDetection.updateSummary();
     App.app.updateBrushToolbar();
     applyProcessing();
   });
@@ -106,7 +106,7 @@ App.app = {
       state.selectedSourceColor = lightest;
       App.colorDetection.renderSwatches();
     }
-    App.colorDetection.updateResetButton();
+    App.colorDetection.updateSummary();
     App.app.updateBrushToolbar();
     applyProcessing();
   });
@@ -121,7 +121,7 @@ App.app = {
     if (state.fileType === 'raster') dom.toleranceRow.style.display = '';
     dom.swatchesSection.style.display = state.detectedColors.length ? '' : 'none';
     App.colorDetection.renderSwatches();
-    App.colorDetection.updateResetButton();
+    App.colorDetection.updateSummary();
   });
 
   // ── Target color events ──
@@ -136,7 +136,7 @@ App.app = {
   dom.targetColorInput.addEventListener('change', function() {
     _colorInputUndoPushed = false; // Reset after picker closes
     App.colorDetection.renderSwatches();
-    App.colorDetection.updateResetButton();
+    App.colorDetection.updateSummary();
   });
   dom.targetColorInput.addEventListener('input', function() {
     state.targetColor = dom.targetColorInput.value;
@@ -154,7 +154,7 @@ App.app = {
       dom.targetColorInput.value = val;
       if (state.selectedSourceColor) state.colorReplacements[state.selectedSourceColor] = state.targetColor;
       App.colorDetection.renderSwatches();
-      App.colorDetection.updateResetButton();
+      App.colorDetection.updateSummary();
       applyProcessing();
     }
   });

@@ -128,7 +128,7 @@ App.colorDetection = {
     dom.targetColorInput.value = state.targetColor;
     dom.targetHexInput.value = state.targetColor;
     App.colorDetection.renderSwatches();
-    App.colorDetection.updateResetButton();
+    App.colorDetection.updateSummary();
     App.app.updateBrushToolbar();
     App.app.applyProcessing();
     return true;
@@ -143,6 +143,20 @@ App.colorDetection = {
       return;
     }
     dom.swatchesSection.style.display = '';
+
+    // Build effective replacements map (saved + current active)
+    var effective = {};
+    var key;
+    for (key in state.colorReplacements) {
+      if (state.colorReplacements[key] !== key) {
+        effective[key] = state.colorReplacements[key];
+      }
+    }
+    if (state.selectedSourceColor && state.targetColor &&
+        state.selectedSourceColor !== state.targetColor) {
+      effective[state.selectedSourceColor] = state.targetColor;
+    }
+
     for (var di = 0; di < state.detectedColors.length; di++) {
       var hex = state.detectedColors[di];
       var el = document.createElement('div');
@@ -155,28 +169,37 @@ App.colorDetection = {
       // Check mark (shown when selected)
       el.innerHTML = '<span class="swatch-check" style="color:' + checkColor + '">&#10003;</span>';
 
-      // Show mapped indicator if this color has a replacement
-      var mappedTarget = state.colorReplacements[hex];
-      if (mappedTarget && mappedTarget !== hex) {
+      // Show split-color visual if this color is mapped
+      var mappedTarget = effective[hex];
+      if (mappedTarget) {
         el.classList.add('mapped');
-        var dot = document.createElement('span');
-        dot.className = 'swatch-mapped-dot';
-        dot.style.background = mappedTarget;
-        dot.title = 'Mapped to ' + mappedTarget;
-        el.appendChild(dot);
 
-        // Remove button (visible on hover)
-        var removeBtn = document.createElement('span');
-        removeBtn.className = 'swatch-remove';
-        removeBtn.innerHTML = '&times;';
-        removeBtn.title = 'Remove this color change';
-        removeBtn.addEventListener('click', (function(sourceHex) {
-          return function(e) {
-            e.stopPropagation();
-            App.colorDetection.removeMapping(sourceHex);
-          };
-        })(hex));
-        el.appendChild(removeBtn);
+        // Right half showing target color
+        var targetHalf = document.createElement('span');
+        targetHalf.className = 'swatch-target-half';
+        targetHalf.style.background = mappedTarget;
+        el.appendChild(targetHalf);
+
+        // Arrow label below
+        var arrow = document.createElement('span');
+        arrow.className = 'swatch-arrow';
+        arrow.textContent = '\u2192' + mappedTarget;
+        el.appendChild(arrow);
+
+        // Remove button (visible on hover for saved mappings only)
+        if (state.colorReplacements[hex]) {
+          var removeBtn = document.createElement('span');
+          removeBtn.className = 'swatch-remove';
+          removeBtn.innerHTML = '&times;';
+          removeBtn.title = 'Remove this color change';
+          removeBtn.addEventListener('click', (function(sourceHex) {
+            return function(e) {
+              e.stopPropagation();
+              App.colorDetection.removeMapping(sourceHex);
+            };
+          })(hex));
+          el.appendChild(removeBtn);
+        }
       }
 
       // Mark selected
@@ -191,6 +214,9 @@ App.colorDetection = {
 
       dom.swatchesEl.appendChild(el);
     }
+
+    // Update summary
+    App.colorDetection.updateSummary();
   },
 
   selectSourceColor: function(hex, el) {
@@ -209,9 +235,7 @@ App.colorDetection = {
     // If clicking the already-selected swatch, deselect it
     if (state.selectedSourceColor === hex) {
       state.selectedSourceColor = null;
-      dom.swatchesEl.querySelectorAll('.swatch').forEach(function(s) { s.classList.remove('selected'); });
       App.colorDetection.renderSwatches();
-      App.colorDetection.updateResetButton();
       App.app.updateBrushToolbar();
       App.app.applyProcessing();
       return;
@@ -227,7 +251,6 @@ App.colorDetection = {
 
     // Re-render swatches to update indicators
     App.colorDetection.renderSwatches();
-    App.colorDetection.updateResetButton();
 
     dom.targetColorRow.style.display = '';
     if (state.fileType === 'raster') dom.toleranceRow.style.display = '';
@@ -250,7 +273,6 @@ App.colorDetection = {
     }
 
     App.colorDetection.renderSwatches();
-    App.colorDetection.updateResetButton();
     App.app.updateBrushToolbar();
     App.app.applyProcessing();
   },
@@ -270,25 +292,28 @@ App.colorDetection = {
     dom.targetHexInput.value = '#ffffff';
 
     App.colorDetection.renderSwatches();
-    App.colorDetection.updateResetButton();
     App.app.updateBrushToolbar();
     App.app.applyProcessing();
     App.utils.showToast('All color changes cleared');
   },
 
-  // Show/hide the reset button based on whether there are mappings
-  updateResetButton: function() {
+  // Update the summary row showing mapping count + reset button
+  updateSummary: function() {
     var state = App.state;
     var dom = App.dom;
-    var hasMappings = false;
+    var count = 0;
     var key;
     for (key in state.colorReplacements) {
       if (state.colorReplacements[key] !== key) {
-        hasMappings = true;
-        break;
+        count++;
       }
     }
-    dom.btnResetColors.style.display = hasMappings ? '' : 'none';
+    if (count > 0) {
+      dom.swatchesSummary.style.display = '';
+      dom.mappingCount.textContent = count + ' color' + (count > 1 ? 's' : '') + ' changed';
+    } else {
+      dom.swatchesSummary.style.display = 'none';
+    }
   },
 
   highlightSwatch: function(hex) {
