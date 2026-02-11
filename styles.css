@@ -257,6 +257,68 @@ body {
   display: flex;
 }
 
+/* Mapped swatch indicator — small dot showing target color */
+.swatch-mapped-dot {
+  position: absolute;
+  bottom: -3px;
+  right: -3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-primary);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.swatch.mapped {
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.4);
+}
+
+.swatch.mapped.selected {
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+/* Remove mapping badge (appears on hover for mapped swatches) */
+.swatch-remove {
+  display: none;
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  cursor: pointer;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.swatch.mapped:hover .swatch-remove {
+  display: block;
+}
+
+/* Reset all colors button */
+.btn-reset-colors {
+  margin-top: 8px;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid #ef4444;
+  background: transparent;
+  color: #ef4444;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.btn-reset-colors:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+
 /* Target color */
 .color-row {
   display: flex;

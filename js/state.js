@@ -17,6 +17,7 @@ window.App = {
     selectedSourceColor: null,
     targetColor: '#ffffff',
     colorReplacements: {},  // { '#source': '#target', ... } accumulated mappings
+    colorUndoStack: [],     // Array of { replacements, selectedSourceColor, targetColor } snapshots
     tolerance: 30,
     selectiveMode: false,
     bgRemoval: false,
@@ -129,6 +130,7 @@ window.App = {
   d.tourSkip = $('tourSkip');
   d.tourBack = $('tourBack');
   d.tourNext = $('tourNext');
+  d.btnResetColors = $('btnResetColors');
   d.btnRestartTour = $('btnRestartTour');
   d.btnHelpTour = $('btnHelpTour');
 })();

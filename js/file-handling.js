@@ -15,6 +15,7 @@ App.fileHandling = {
     state.detectedColors = [];
     state.selectedSourceColor = null;
     state.colorReplacements = {};
+    state.colorUndoStack = [];
     state.presetMode = null;
     state.processing = false;
     dom.editor.classList.remove('active');

@@ -97,6 +97,43 @@ App.colorDetection = {
     App.colorDetection.renderSwatches();
   },
 
+  // Push current color state onto undo stack
+  pushColorUndo: function() {
+    var state = App.state;
+    var snapshot = {
+      replacements: {},
+      selectedSourceColor: state.selectedSourceColor,
+      targetColor: state.targetColor
+    };
+    var key;
+    for (key in state.colorReplacements) {
+      snapshot.replacements[key] = state.colorReplacements[key];
+    }
+    state.colorUndoStack.push(snapshot);
+    // Cap stack size
+    if (state.colorUndoStack.length > 50) {
+      state.colorUndoStack.shift();
+    }
+  },
+
+  // Pop color undo stack and restore state
+  undoColor: function() {
+    var state = App.state;
+    var dom = App.dom;
+    if (!state.colorUndoStack.length) return false;
+    var snapshot = state.colorUndoStack.pop();
+    state.colorReplacements = snapshot.replacements;
+    state.selectedSourceColor = snapshot.selectedSourceColor;
+    state.targetColor = snapshot.targetColor;
+    dom.targetColorInput.value = state.targetColor;
+    dom.targetHexInput.value = state.targetColor;
+    App.colorDetection.renderSwatches();
+    App.colorDetection.updateResetButton();
+    App.app.updateBrushToolbar();
+    App.app.applyProcessing();
+    return true;
+  },
+
   renderSwatches: function() {
     var state = App.state;
     var dom = App.dom;
@@ -114,10 +151,44 @@ App.colorDetection = {
       el.title = hex;
       var lum = App.utils.luminance(App.utils.hexToRgb(hex));
       var checkColor = lum > 0.5 ? '#000' : '#fff';
+
+      // Check mark (shown when selected)
       el.innerHTML = '<span class="swatch-check" style="color:' + checkColor + '">&#10003;</span>';
+
+      // Show mapped indicator if this color has a replacement
+      var mappedTarget = state.colorReplacements[hex];
+      if (mappedTarget && mappedTarget !== hex) {
+        el.classList.add('mapped');
+        var dot = document.createElement('span');
+        dot.className = 'swatch-mapped-dot';
+        dot.style.background = mappedTarget;
+        dot.title = 'Mapped to ' + mappedTarget;
+        el.appendChild(dot);
+
+        // Remove button (visible on hover)
+        var removeBtn = document.createElement('span');
+        removeBtn.className = 'swatch-remove';
+        removeBtn.innerHTML = '&times;';
+        removeBtn.title = 'Remove this color change';
+        removeBtn.addEventListener('click', (function(sourceHex) {
+          return function(e) {
+            e.stopPropagation();
+            App.colorDetection.removeMapping(sourceHex);
+          };
+        })(hex));
+        el.appendChild(removeBtn);
+      }
+
+      // Mark selected
+      if (hex === state.selectedSourceColor) {
+        el.classList.add('selected');
+      }
+
+      // Click handler: select or deselect
       el.addEventListener('click', (function(h, e) {
         return function() { App.colorDetection.selectSourceColor(h, e); };
       })(hex, el));
+
       dom.swatchesEl.appendChild(el);
     }
   },
@@ -125,11 +196,27 @@ App.colorDetection = {
   selectSourceColor: function(hex, el) {
     var state = App.state;
     var dom = App.dom;
+
+    // Push undo before any change
+    App.colorDetection.pushColorUndo();
+
     // Save current mapping before switching (if there's an active replacement)
     if (state.selectedSourceColor && state.targetColor &&
         state.selectedSourceColor !== state.targetColor) {
       state.colorReplacements[state.selectedSourceColor] = state.targetColor;
     }
+
+    // If clicking the already-selected swatch, deselect it
+    if (state.selectedSourceColor === hex) {
+      state.selectedSourceColor = null;
+      dom.swatchesEl.querySelectorAll('.swatch').forEach(function(s) { s.classList.remove('selected'); });
+      App.colorDetection.renderSwatches();
+      App.colorDetection.updateResetButton();
+      App.app.updateBrushToolbar();
+      App.app.applyProcessing();
+      return;
+    }
+
     state.selectedSourceColor = hex;
     // Restore previous target if this color was already mapped, otherwise keep current
     if (state.colorReplacements[hex]) {
@@ -137,12 +224,71 @@ App.colorDetection = {
       dom.targetColorInput.value = state.targetColor;
       dom.targetHexInput.value = state.targetColor;
     }
-    dom.swatchesEl.querySelectorAll('.swatch').forEach(function(s) { s.classList.remove('selected'); });
-    el.classList.add('selected');
+
+    // Re-render swatches to update indicators
+    App.colorDetection.renderSwatches();
+    App.colorDetection.updateResetButton();
+
     dom.targetColorRow.style.display = '';
     if (state.fileType === 'raster') dom.toleranceRow.style.display = '';
     App.app.updateBrushToolbar();
     App.app.applyProcessing();
+  },
+
+  // Remove a single color mapping
+  removeMapping: function(sourceHex) {
+    var state = App.state;
+
+    // Push undo before removing
+    App.colorDetection.pushColorUndo();
+
+    delete state.colorReplacements[sourceHex];
+
+    // If we just removed the currently selected color's mapping, clear selection
+    if (state.selectedSourceColor === sourceHex) {
+      state.selectedSourceColor = null;
+    }
+
+    App.colorDetection.renderSwatches();
+    App.colorDetection.updateResetButton();
+    App.app.updateBrushToolbar();
+    App.app.applyProcessing();
+  },
+
+  // Reset all color mappings
+  resetAllColors: function() {
+    var state = App.state;
+    var dom = App.dom;
+
+    // Push undo before reset
+    App.colorDetection.pushColorUndo();
+
+    state.colorReplacements = {};
+    state.selectedSourceColor = null;
+    state.targetColor = '#ffffff';
+    dom.targetColorInput.value = '#ffffff';
+    dom.targetHexInput.value = '#ffffff';
+
+    App.colorDetection.renderSwatches();
+    App.colorDetection.updateResetButton();
+    App.app.updateBrushToolbar();
+    App.app.applyProcessing();
+    App.utils.showToast('All color changes cleared');
+  },
+
+  // Show/hide the reset button based on whether there are mappings
+  updateResetButton: function() {
+    var state = App.state;
+    var dom = App.dom;
+    var hasMappings = false;
+    var key;
+    for (key in state.colorReplacements) {
+      if (state.colorReplacements[key] !== key) {
+        hasMappings = true;
+        break;
+      }
+    }
+    dom.btnResetColors.style.display = hasMappings ? '' : 'none';
   },
 
   highlightSwatch: function(hex) {

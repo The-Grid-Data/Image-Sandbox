@@ -61,6 +61,7 @@ App.app = {
 
   // ── Preset events ──
   dom.presetWhite.addEventListener('click', function() {
+    App.colorDetection.pushColorUndo();
     clearPresetButtons();
     dom.presetWhite.classList.add('active');
     state.presetMode = 'white';
@@ -77,13 +78,15 @@ App.app = {
         return App.utils.luminance(App.utils.hexToRgb(a)) - App.utils.luminance(App.utils.hexToRgb(b));
       })[0];
       state.selectedSourceColor = darkest;
-      App.colorDetection.highlightSwatch(darkest);
+      App.colorDetection.renderSwatches();
     }
+    App.colorDetection.updateResetButton();
     App.app.updateBrushToolbar();
     applyProcessing();
   });
 
   dom.presetBlack.addEventListener('click', function() {
+    App.colorDetection.pushColorUndo();
     clearPresetButtons();
     dom.presetBlack.classList.add('active');
     state.presetMode = 'black';
@@ -101,13 +104,15 @@ App.app = {
         .sort(function(a, b) { return App.utils.luminance(App.utils.hexToRgb(b)) - App.utils.luminance(App.utils.hexToRgb(a)); })[0]
         || state.detectedColors[0];
       state.selectedSourceColor = lightest;
-      App.colorDetection.highlightSwatch(lightest);
+      App.colorDetection.renderSwatches();
     }
+    App.colorDetection.updateResetButton();
     App.app.updateBrushToolbar();
     applyProcessing();
   });
 
   dom.presetCustom.addEventListener('click', function() {
+    App.colorDetection.pushColorUndo();
     clearPresetButtons();
     dom.presetCustom.classList.add('active');
     state.presetMode = 'custom';
@@ -115,9 +120,24 @@ App.app = {
     dom.targetColorRow.style.display = '';
     if (state.fileType === 'raster') dom.toleranceRow.style.display = '';
     dom.swatchesSection.style.display = state.detectedColors.length ? '' : 'none';
+    App.colorDetection.renderSwatches();
+    App.colorDetection.updateResetButton();
   });
 
   // ── Target color events ──
+  var _colorInputUndoPushed = false;
+  dom.targetColorInput.addEventListener('mousedown', function() {
+    // Push undo once when user starts picking a new color
+    if (!_colorInputUndoPushed) {
+      App.colorDetection.pushColorUndo();
+      _colorInputUndoPushed = true;
+    }
+  });
+  dom.targetColorInput.addEventListener('change', function() {
+    _colorInputUndoPushed = false; // Reset after picker closes
+    App.colorDetection.renderSwatches();
+    App.colorDetection.updateResetButton();
+  });
   dom.targetColorInput.addEventListener('input', function() {
     state.targetColor = dom.targetColorInput.value;
     dom.targetHexInput.value = dom.targetColorInput.value;
@@ -129,9 +149,12 @@ App.app = {
     var val = dom.targetHexInput.value.trim();
     if (!val.startsWith('#')) val = '#' + val;
     if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+      App.colorDetection.pushColorUndo();
       state.targetColor = val.toLowerCase();
       dom.targetColorInput.value = val;
       if (state.selectedSourceColor) state.colorReplacements[state.selectedSourceColor] = state.targetColor;
+      App.colorDetection.renderSwatches();
+      App.colorDetection.updateResetButton();
       applyProcessing();
     }
   });
@@ -392,11 +415,26 @@ App.app = {
   });
 
   // ── Undo/redo ──
-  dom.btnUndo.addEventListener('click', function() { App.zoomPan.undo(); });
+  dom.btnUndo.addEventListener('click', function() {
+    // Try brush undo first, then fall back to color undo
+    if (App.state.undoStack.length) {
+      App.zoomPan.undo();
+    } else {
+      App.colorDetection.undoColor();
+    }
+  });
   dom.btnRedo.addEventListener('click', function() { App.zoomPan.redo(); });
   window.addEventListener('keydown', function(e) {
     if (['INPUT','SELECT'].includes(document.activeElement && document.activeElement.tagName)) return;
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); App.zoomPan.undo(); }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      // Try brush undo first, then fall back to color undo
+      if (App.state.undoStack.length) {
+        App.zoomPan.undo();
+      } else {
+        App.colorDetection.undoColor();
+      }
+    }
     else if ((e.ctrlKey || e.metaKey) && (e.key === 'Z' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); App.zoomPan.redo(); }
     else if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); App.zoomPan.redo(); }
   });
@@ -485,6 +523,9 @@ App.app = {
   // Restart tour buttons (footer + help panel)
   dom.btnRestartTour.addEventListener('click', function() { App.tutorial.restartTour(); });
   dom.btnHelpTour.addEventListener('click', function() { App.tutorial.restartTour(); });
+
+  // ── Reset all colors ──
+  dom.btnResetColors.addEventListener('click', function() { App.colorDetection.resetAllColors(); });
 
   // Auto-start tour on first visit
   if (App.tutorial.shouldShowTour()) {
