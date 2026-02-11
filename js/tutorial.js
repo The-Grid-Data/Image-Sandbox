@@ -23,7 +23,7 @@ var TOUR_STEPS = [
     position: 'bottom'
   },
   {
-    target: 'bgRemovalToggle',
+    target: 'bgRemovalRow',
     content: '<strong>Remove Background</strong><br>Toggle this on to erase the background. It works from the edges inward so it won\'t damage the logo. Use Threshold and Edge Protection to fine-tune.',
     position: 'right'
   },
@@ -44,7 +44,7 @@ var TOUR_STEPS = [
     position: 'bottom'
   },
   {
-    target: 'upscaleToggle',
+    target: 'upscaleRow',
     content: '<strong>Upscale</strong><br>Make your image bigger and sharper. Choose 2x (double) or 4x (quadruple). Great for low-res logos that need to be used at larger sizes.',
     position: 'right'
   },
