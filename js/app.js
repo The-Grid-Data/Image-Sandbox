@@ -475,7 +475,7 @@ App.app = {
   dom.tourNext.addEventListener('click', function() { App.tutorial.nextStep(); });
   dom.tourBack.addEventListener('click', function() { App.tutorial.prevStep(); });
   dom.tourSkip.addEventListener('click', function() { App.tutorial.endTour(); });
-  dom.tourOverlay.addEventListener('click', function() { App.tutorial.endTour(); });
+  // No overlay click-to-dismiss — tour persists until Skip/Finish is clicked
 
   // Restart tour buttons (footer + help panel)
   dom.btnRestartTour.addEventListener('click', function() { App.tutorial.restartTour(); });

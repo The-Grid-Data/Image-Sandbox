@@ -57,7 +57,7 @@ var TOUR_STEPS = [
   {
     target: 'btnHelpMain',
     content: '<strong>Need help later?</strong><br>Click "Need help?" anytime to open the full help guide with detailed instructions for every feature.',
-    position: 'bottom'
+    position: 'left'
   }
 ];
 
@@ -110,7 +110,7 @@ App.tutorial = {
 
     // Scroll target into view so off-screen elements are visible
     if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target.scrollIntoView({ behavior: 'auto', block: 'center' });
     }
 
     // Brief delay so scroll settles before measuring positions
