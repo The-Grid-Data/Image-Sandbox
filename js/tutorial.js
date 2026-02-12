@@ -14,7 +14,7 @@ var TOUR_STEPS = [
   },
   {
     target: 'controlsPanel',
-    content: '<strong>Quick Presets</strong><br>Click "Make White" or "Make Black" to instantly change your logo\'s main color. Use "Custom Color" to pick any color you want.',
+    content: '<strong>Quick Presets</strong><br>Click "Make White" or "Make Black" to instantly change your logo\'s main color. Use "Custom Color" to pick any color you want.<br><br>You can change <strong>multiple colors</strong> — click different swatches and each change is saved. Look for the &#10003; on changed swatches. Use <strong>Undo</strong> or <strong>Reset All</strong> below the swatches to manage your changes.',
     position: 'right'
   },
   {
@@ -31,7 +31,7 @@ var TOUR_STEPS = [
   {
     target: 'brushToolbar',
     reveal: true,
-    content: '<strong>Brush Touchup</strong><br>This toolbar appears after you change colors or remove the background. Use <strong>Restore</strong> to bring back areas, or <strong>Erase</strong> to remove more. Ctrl+Z to undo.',
+    content: '<strong>Brush Touchup</strong><br>This toolbar appears after you change colors or remove the background. Use <strong>Restore</strong> to bring back areas, or <strong>Erase</strong> to remove more. Ctrl+Z undoes brush strokes or color changes.',
     position: 'bottom'
   },
   {
