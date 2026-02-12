@@ -138,6 +138,9 @@ App.colorDetection = {
     var state = App.state;
     var dom = App.dom;
     dom.swatchesEl.innerHTML = '';
+    // Debug: count mappings to verify this code version is running
+    var _dbgCount = 0; for (var _k in state.colorReplacements) { if (state.colorReplacements[_k] !== _k) _dbgCount++; }
+    console.log('[renderSwatches v3] mappings=' + _dbgCount + ', selected=' + state.selectedSourceColor + ', target=' + state.targetColor);
     if (!state.detectedColors.length) {
       dom.swatchesSection.style.display = 'none';
       return;
@@ -235,6 +238,7 @@ App.colorDetection = {
     if (state.selectedSourceColor && state.targetColor &&
         state.selectedSourceColor !== state.targetColor) {
       state.colorReplacements[state.selectedSourceColor] = state.targetColor;
+      console.log('[selectSourceColor] SAVED mapping: ' + state.selectedSourceColor + ' → ' + state.targetColor);
     }
 
     // If clicking the already-selected swatch, deselect it
