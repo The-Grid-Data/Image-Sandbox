@@ -11,39 +11,91 @@ App.bgRemoval = {
     var data = state.originalData.data;
     var w = state.originalData.width;
     var h = state.originalData.height;
-    // Sample corner pixels
-    var corners = [
-      0,
-      (w - 1) * 4,
-      (h - 1) * w * 4,
-      ((h - 1) * w + (w - 1)) * 4
+
+    // Dense edge sampling: ~25 samples per edge = ~100 total
+    var edgeSamples = [];
+    var strideX = Math.max(1, Math.floor(w / 25));
+    var strideY = Math.max(1, Math.floor(h / 25));
+    // Top and bottom edges
+    for (var x = 0; x < w; x += strideX) {
+      var iT = x * 4;
+      if (data[iT + 3] > 128) edgeSamples.push({ r: data[iT], g: data[iT + 1], b: data[iT + 2] });
+      var iB = ((h - 1) * w + x) * 4;
+      if (data[iB + 3] > 128) edgeSamples.push({ r: data[iB], g: data[iB + 1], b: data[iB + 2] });
+    }
+    // Left and right edges
+    for (var y = 1; y < h - 1; y += strideY) {
+      var iL = (y * w) * 4;
+      if (data[iL + 3] > 128) edgeSamples.push({ r: data[iL], g: data[iL + 1], b: data[iL + 2] });
+      var iR = (y * w + w - 1) * 4;
+      if (data[iR + 3] > 128) edgeSamples.push({ r: data[iR], g: data[iR + 1], b: data[iR + 2] });
+    }
+
+    if (edgeSamples.length < 10) {
+      // Fallback: average whatever we have
+      var rS = 0, gS = 0, bS = 0;
+      for (var fi = 0; fi < edgeSamples.length; fi++) {
+        rS += edgeSamples[fi].r; gS += edgeSamples[fi].g; bS += edgeSamples[fi].b;
+      }
+      if (edgeSamples.length > 0) {
+        var hex0 = App.utils.rgbToHex(Math.round(rS / edgeSamples.length), Math.round(gS / edgeSamples.length), Math.round(bS / edgeSamples.length));
+        state.bgRemovalColor = hex0;
+        dom.bgRemovalColorInput.value = hex0;
+        dom.bgRemovalHexInput.value = hex0;
+        App.utils.showToast('Detected background: ' + hex0, 'success');
+      }
+      return;
+    }
+
+    // K-means clustering (k=3, 5 iterations) to find dominant bg color
+    var k = 3;
+    var n = edgeSamples.length;
+    var centroids = [
+      { r: edgeSamples[0].r, g: edgeSamples[0].g, b: edgeSamples[0].b },
+      { r: edgeSamples[Math.floor(n / 3)].r, g: edgeSamples[Math.floor(n / 3)].g, b: edgeSamples[Math.floor(n / 3)].b },
+      { r: edgeSamples[Math.floor(2 * n / 3)].r, g: edgeSamples[Math.floor(2 * n / 3)].g, b: edgeSamples[Math.floor(2 * n / 3)].b }
     ];
-    var samples = corners.slice();
-    var offsets = [1, w, w+1];
-    for (var ci = 0; ci < corners.length; ci++) {
-      var c = corners[ci];
-      for (var oi = 0; oi < offsets.length; oi++) {
-        var idx = c + offsets[oi] * 4;
-        if (idx >= 0 && idx < data.length - 3) samples.push(idx);
+    var assignments = new Array(n);
+
+    for (var iter = 0; iter < 5; iter++) {
+      // Assign each sample to nearest centroid
+      for (var si = 0; si < n; si++) {
+        var s = edgeSamples[si];
+        var bestC = 0, bestD = Infinity;
+        for (var ci = 0; ci < k; ci++) {
+          var c = centroids[ci];
+          var dd = (s.r - c.r) * (s.r - c.r) + (s.g - c.g) * (s.g - c.g) + (s.b - c.b) * (s.b - c.b);
+          if (dd < bestD) { bestD = dd; bestC = ci; }
+        }
+        assignments[si] = bestC;
+      }
+      // Recompute centroids
+      for (var ci2 = 0; ci2 < k; ci2++) {
+        var rA = 0, gA = 0, bA = 0, cnt = 0;
+        for (var si2 = 0; si2 < n; si2++) {
+          if (assignments[si2] === ci2) {
+            rA += edgeSamples[si2].r; gA += edgeSamples[si2].g; bA += edgeSamples[si2].b; cnt++;
+          }
+        }
+        if (cnt > 0) {
+          centroids[ci2] = { r: rA / cnt, g: gA / cnt, b: bA / cnt };
+        }
       }
     }
-    var rSum = 0, gSum = 0, bSum = 0, count = 0;
-    for (var si = 0; si < samples.length; si++) {
-      var i = samples[si];
-      if (data[i+3] > 128) {
-        rSum += data[i]; gSum += data[i+1]; bSum += data[i+2]; count++;
-      }
-    }
-    if (count > 0) {
-      var r = Math.round(rSum / count);
-      var g = Math.round(gSum / count);
-      var b = Math.round(bSum / count);
-      var hex = App.utils.rgbToHex(r, g, b);
-      state.bgRemovalColor = hex;
-      dom.bgRemovalColorInput.value = hex;
-      dom.bgRemovalHexInput.value = hex;
-      App.utils.showToast('Detected background: ' + hex, 'success');
-    }
+
+    // Pick cluster with most members
+    var clusterCounts = [0, 0, 0];
+    for (var ai = 0; ai < n; ai++) clusterCounts[assignments[ai]]++;
+    var bestCluster = 0;
+    if (clusterCounts[1] > clusterCounts[bestCluster]) bestCluster = 1;
+    if (clusterCounts[2] > clusterCounts[bestCluster]) bestCluster = 2;
+
+    var winner = centroids[bestCluster];
+    var hex = App.utils.rgbToHex(Math.round(winner.r), Math.round(winner.g), Math.round(winner.b));
+    state.bgRemovalColor = hex;
+    dom.bgRemovalColorInput.value = hex;
+    dom.bgRemovalHexInput.value = hex;
+    App.utils.showToast('Detected background: ' + hex, 'success');
   },
 
   setBrushMode: function(mode) {
@@ -284,6 +336,72 @@ App.bgRemoval = {
     return Math.max(minT, Math.min(maxT, adaptive));
   },
 
+  // Compute neighbor-to-neighbor color distance along edges to gauge gradient strength
+  computeLocalThreshold: function(srcData, w, h, baseThreshold) {
+    var neighborDists = [];
+    var step = Math.max(1, Math.floor(w / 50));
+    var stepY = Math.max(1, Math.floor(h / 50));
+    // Top edge: consecutive pairs
+    for (var x = step; x < w; x += step) {
+      var curr = x * 4;
+      var prev = (x - step) * 4;
+      if (srcData[curr + 3] > 128 && srcData[prev + 3] > 128) {
+        var dr = srcData[curr] - srcData[prev];
+        var dg = srcData[curr + 1] - srcData[prev + 1];
+        var db = srcData[curr + 2] - srcData[prev + 2];
+        neighborDists.push(Math.sqrt(dr * dr + dg * dg + db * db));
+      }
+    }
+    // Bottom edge
+    for (var x2 = step; x2 < w; x2 += step) {
+      var bCurr = ((h - 1) * w + x2) * 4;
+      var bPrev = ((h - 1) * w + x2 - step) * 4;
+      if (srcData[bCurr + 3] > 128 && srcData[bPrev + 3] > 128) {
+        var dr2 = srcData[bCurr] - srcData[bPrev];
+        var dg2 = srcData[bCurr + 1] - srcData[bPrev + 1];
+        var db2 = srcData[bCurr + 2] - srcData[bPrev + 2];
+        neighborDists.push(Math.sqrt(dr2 * dr2 + dg2 * dg2 + db2 * db2));
+      }
+    }
+    // Left edge
+    for (var y = stepY; y < h; y += stepY) {
+      var lCurr = (y * w) * 4;
+      var lPrev = ((y - stepY) * w) * 4;
+      if (srcData[lCurr + 3] > 128 && srcData[lPrev + 3] > 128) {
+        var dr3 = srcData[lCurr] - srcData[lPrev];
+        var dg3 = srcData[lCurr + 1] - srcData[lPrev + 1];
+        var db3 = srcData[lCurr + 2] - srcData[lPrev + 2];
+        neighborDists.push(Math.sqrt(dr3 * dr3 + dg3 * dg3 + db3 * db3));
+      }
+    }
+    // Right edge
+    for (var y2 = stepY; y2 < h; y2 += stepY) {
+      var rCurr = (y2 * w + w - 1) * 4;
+      var rPrev = ((y2 - stepY) * w + w - 1) * 4;
+      if (srcData[rCurr + 3] > 128 && srcData[rPrev + 3] > 128) {
+        var dr4 = srcData[rCurr] - srcData[rPrev];
+        var dg4 = srcData[rCurr + 1] - srcData[rPrev + 1];
+        var db4 = srcData[rCurr + 2] - srcData[rPrev + 2];
+        neighborDists.push(Math.sqrt(dr4 * dr4 + dg4 * dg4 + db4 * db4));
+      }
+    }
+    if (neighborDists.length < 5) return baseThreshold * 1.2;
+    var nSum = 0;
+    for (var ni = 0; ni < neighborDists.length; ni++) nSum += neighborDists[ni];
+    var nMean = nSum / neighborDists.length;
+    var nSqSum = 0;
+    for (var ni2 = 0; ni2 < neighborDists.length; ni2++) {
+      var nd = neighborDists[ni2] - nMean;
+      nSqSum += nd * nd;
+    }
+    var nStddev = Math.sqrt(nSqSum / neighborDists.length);
+    var localT = nMean + 2 * nStddev;
+    // Clamp to reasonable range around baseThreshold
+    var loT = baseThreshold * 0.5;
+    var hiT = baseThreshold * 2.0;
+    return Math.max(loT, Math.min(hiT, localT));
+  },
+
   // Suppress color spill on boundary pixels by blending toward nearest foreground
   suppressColorSpill: function(outData, mask, srcData, w, h, bgRgb) {
     var totalPixels = w * h;
@@ -334,31 +452,65 @@ App.bgRemoval = {
   buildEdgeFloodMask: function(srcData, w, h, bgRgb, bgThreshold, edgeMap) {
     var totalPixels = w * h;
     var maxDist = App.bgRemoval.computeAdaptiveThreshold(srcData, w, h, bgRgb, bgThreshold);
+    var localThreshold = App.bgRemoval.computeLocalThreshold(srcData, w, h, bgThreshold);
+    var globalCeiling = maxDist * 2.5;
 
     var visited = new Uint8Array(totalPixels);
     var mask = new Float32Array(totalPixels);
     mask.fill(1.0);
 
-    function pixelDist(p) {
+    // Parent index for local-neighbor comparison (-1 = seed/no parent)
+    var parentIdx = new Int32Array(totalPixels);
+    for (var pi = 0; pi < totalPixels; pi++) parentIdx[pi] = -1;
+
+    function globalDist(p) {
       var i = p * 4;
-      var a = srcData[i + 3];
-      if (a < 10) return -1;
+      if (srcData[i + 3] < 10) return -1;
       var dr = srcData[i] - bgRgb.r;
       var dg = srcData[i + 1] - bgRgb.g;
       var db = srcData[i + 2] - bgRgb.b;
       return Math.sqrt(dr * dr + dg * dg + db * db);
     }
 
-    function isBgPixel(p) {
-      var d = pixelDist(p);
-      return d < 0 || d < maxDist;
+    function localDist(p, parent) {
+      var i = p * 4;
+      var j = parent * 4;
+      var dr = srcData[i] - srcData[j];
+      var dg = srcData[i + 1] - srcData[j + 1];
+      var db = srcData[i + 2] - srcData[j + 2];
+      return Math.sqrt(dr * dr + dg * dg + db * db);
     }
 
-    function getBgFactor(p) {
-      var d = pixelDist(p);
-      if (d < 0) return 0.0;
-      if (d >= maxDist) return 1.0;
-      return d / maxDist;
+    // Dual test: global OR local, with ceiling
+    function isBgCandidate(p, parentP) {
+      var gd = globalDist(p);
+      if (gd < 0) return true;           // transparent = bg
+      if (gd > globalCeiling) return false; // too far, hard stop
+      if (gd < maxDist) return true;      // close to global bg
+      // Local test: similar to BFS parent (gradient following)
+      if (parentP >= 0) {
+        var ld = localDist(p, parentP);
+        if (ld < localThreshold) return true;
+      }
+      return false;
+    }
+
+    // Seeds use global test only (no parent)
+    function isBgSeed(p) {
+      var gd = globalDist(p);
+      return gd < 0 || gd < maxDist;
+    }
+
+    function getBgFactor(p, parentP) {
+      var gd = globalDist(p);
+      if (gd < 0) return 0.0;
+      var globalFactor = Math.min(1.0, gd / globalCeiling);
+      if (parentP >= 0) {
+        var ld = localDist(p, parentP);
+        var localFactor = Math.min(1.0, ld / localThreshold);
+        return Math.min(globalFactor, localFactor);
+      }
+      return Math.min(1.0, gd / maxDist);
     }
 
     function bfsFlood(seeds) {
@@ -366,12 +518,13 @@ App.bgRemoval = {
       var head = 0;
       while (head < queue.length) {
         var p = queue[head++];
-        mask[p] = getBgFactor(p);
+        var pp = parentIdx[p];
+        mask[p] = getBgFactor(p, pp);
 
         var x = p % w;
         var y = (p - x) / w;
 
-        // 8-connected: cardinal + diagonal neighbors for smoother edges
+        // 8-connected neighbors
         var neighbors = [];
         if (x > 0)                     neighbors.push(p - 1);
         if (x < w - 1)                 neighbors.push(p + 1);
@@ -384,46 +537,51 @@ App.bgRemoval = {
         for (var ni = 0; ni < neighbors.length; ni++) {
           var np = neighbors[ni];
           if (!visited[np]) {
-            if (isBgPixel(np)) {
-              // If edge map is provided, strong edges block flood unless pixel is very close to bg
+            if (isBgCandidate(np, p)) {
+              // Edge map gate: strong edges block unless very close to bg
               if (edgeMap && edgeMap[np] > 0.4) {
-                var edgeDist = pixelDist(np);
-                if (edgeDist >= 0 && edgeDist > maxDist * 0.3) {
-                  visited[np] = 2; // blocked by edge
+                var edgGd = globalDist(np);
+                if (edgGd >= 0 && edgGd > maxDist * 0.3) {
+                  visited[np] = 2;
                   continue;
                 }
               }
-              visited[np] = 1; queue.push(np);
-            } else { visited[np] = 2; }
+              parentIdx[np] = p;
+              visited[np] = 1;
+              queue.push(np);
+            } else {
+              visited[np] = 2;
+            }
           }
         }
       }
       return queue.length;
     }
 
-    // Pass 1: Flood from edges
+    // Pass 1: Flood from edges (seeds use global test only)
     var edgeSeeds = [];
     for (var x = 0; x < w; x++) {
       var top = x, bot = (h - 1) * w + x;
-      if (isBgPixel(top) && !visited[top]) { visited[top] = 1; edgeSeeds.push(top); }
-      if (isBgPixel(bot) && !visited[bot]) { visited[bot] = 1; edgeSeeds.push(bot); }
+      if (isBgSeed(top) && !visited[top]) { visited[top] = 1; edgeSeeds.push(top); }
+      if (isBgSeed(bot) && !visited[bot]) { visited[bot] = 1; edgeSeeds.push(bot); }
     }
     for (var y = 1; y < h - 1; y++) {
       var left = y * w, right = y * w + (w - 1);
-      if (isBgPixel(left)  && !visited[left])  { visited[left]  = 1; edgeSeeds.push(left); }
-      if (isBgPixel(right) && !visited[right]) { visited[right] = 1; edgeSeeds.push(right); }
+      if (isBgSeed(left)  && !visited[left])  { visited[left]  = 1; edgeSeeds.push(left); }
+      if (isBgSeed(right) && !visited[right]) { visited[right] = 1; edgeSeeds.push(right); }
     }
     bfsFlood(edgeSeeds);
 
-    // Pass 2: Find interior holes
+    // Pass 2: Find interior bg holes
     var minHoleSize = Math.max(20, totalPixels * 0.0002);
 
-    for (var p = 0; p < totalPixels; p++) {
-      if (visited[p] !== 0) continue;
-      if (!isBgPixel(p)) { visited[p] = 2; continue; }
+    for (var p2 = 0; p2 < totalPixels; p2++) {
+      if (visited[p2] !== 0) continue;
+      if (!isBgSeed(p2)) { visited[p2] = 2; continue; }
 
-      var region = [p];
-      visited[p] = 1;
+      var region = [p2];
+      visited[p2] = 1;
+      parentIdx[p2] = -1;
       var rHead = 0;
       while (rHead < region.length) {
         var rp = region[rHead++];
@@ -438,10 +596,11 @@ App.bgRemoval = {
         if (rx < w - 1 && ry > 0)        nbs.push(rp - w + 1);
         if (rx > 0 && ry < h - 1)        nbs.push(rp + w - 1);
         if (rx < w - 1 && ry < h - 1)    nbs.push(rp + w + 1);
-        for (var ni = 0; ni < nbs.length; ni++) {
-          var np5 = nbs[ni];
+        for (var ni2 = 0; ni2 < nbs.length; ni2++) {
+          var np5 = nbs[ni2];
           if (visited[np5] === 0) {
-            if (isBgPixel(np5)) {
+            if (isBgCandidate(np5, rp)) {
+              parentIdx[np5] = rp;
               visited[np5] = 1;
               region.push(np5);
             } else {
@@ -453,7 +612,8 @@ App.bgRemoval = {
 
       if (region.length >= minHoleSize) {
         for (var ri = 0; ri < region.length; ri++) {
-          mask[region[ri]] = getBgFactor(region[ri]);
+          var rip = region[ri];
+          mask[rip] = getBgFactor(rip, parentIdx[rip]);
         }
       } else {
         for (var ri2 = 0; ri2 < region.length; ri2++) {
