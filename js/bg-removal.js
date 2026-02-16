@@ -191,9 +191,149 @@ App.bgRemoval = {
     state._brushedCanvas = canvas;
   },
 
-  buildEdgeFloodMask: function(srcData, w, h, bgRgb, bgThreshold) {
+  // Compute Sobel edge strength map — returns Float32Array of normalized gradient magnitudes [0..1]
+  computeEdgeStrength: function(srcData, w, h) {
     var totalPixels = w * h;
-    var maxDist = bgThreshold * 2.5;
+    var gray = new Float32Array(totalPixels);
+    // Convert to grayscale
+    for (var p = 0; p < totalPixels; p++) {
+      var i = p * 4;
+      gray[p] = (srcData[i] * 0.299 + srcData[i + 1] * 0.587 + srcData[i + 2] * 0.114) / 255;
+    }
+    var edgeMap = new Float32Array(totalPixels);
+    for (var y = 1; y < h - 1; y++) {
+      for (var x = 1; x < w - 1; x++) {
+        var idx = y * w + x;
+        // Sobel X kernel
+        var gx = -gray[idx - w - 1] + gray[idx - w + 1]
+               - 2 * gray[idx - 1] + 2 * gray[idx + 1]
+               - gray[idx + w - 1] + gray[idx + w + 1];
+        // Sobel Y kernel
+        var gy = -gray[idx - w - 1] - 2 * gray[idx - w] - gray[idx - w + 1]
+               + gray[idx + w - 1] + 2 * gray[idx + w] + gray[idx + w + 1];
+        edgeMap[idx] = Math.sqrt(gx * gx + gy * gy);
+      }
+    }
+    // Normalize to [0..1]
+    var maxVal = 0;
+    for (var e = 0; e < totalPixels; e++) {
+      if (edgeMap[e] > maxVal) maxVal = edgeMap[e];
+    }
+    if (maxVal > 0) {
+      for (var e2 = 0; e2 < totalPixels; e2++) {
+        edgeMap[e2] /= maxVal;
+      }
+    }
+    return edgeMap;
+  },
+
+  // Sample edge pixels to compute adaptive threshold
+  computeAdaptiveThreshold: function(srcData, w, h, bgRgb, baseThreshold) {
+    var distances = [];
+    var step = Math.max(1, Math.floor(w / 50));
+    // Sample top/bottom edges
+    for (var x = 0; x < w; x += step) {
+      var iTop = x * 4;
+      var iBot = ((h - 1) * w + x) * 4;
+      if (srcData[iTop + 3] > 128) {
+        var dr = srcData[iTop] - bgRgb.r;
+        var dg = srcData[iTop + 1] - bgRgb.g;
+        var db = srcData[iTop + 2] - bgRgb.b;
+        distances.push(Math.sqrt(dr * dr + dg * dg + db * db));
+      }
+      if (srcData[iBot + 3] > 128) {
+        var dr2 = srcData[iBot] - bgRgb.r;
+        var dg2 = srcData[iBot + 1] - bgRgb.g;
+        var db2 = srcData[iBot + 2] - bgRgb.b;
+        distances.push(Math.sqrt(dr2 * dr2 + dg2 * dg2 + db2 * db2));
+      }
+    }
+    // Sample left/right edges
+    var stepY = Math.max(1, Math.floor(h / 50));
+    for (var y = 0; y < h; y += stepY) {
+      var iLeft = (y * w) * 4;
+      var iRight = (y * w + w - 1) * 4;
+      if (srcData[iLeft + 3] > 128) {
+        var dr3 = srcData[iLeft] - bgRgb.r;
+        var dg3 = srcData[iLeft + 1] - bgRgb.g;
+        var db3 = srcData[iLeft + 2] - bgRgb.b;
+        distances.push(Math.sqrt(dr3 * dr3 + dg3 * dg3 + db3 * db3));
+      }
+      if (srcData[iRight + 3] > 128) {
+        var dr4 = srcData[iRight] - bgRgb.r;
+        var dg4 = srcData[iRight + 1] - bgRgb.g;
+        var db4 = srcData[iRight + 2] - bgRgb.b;
+        distances.push(Math.sqrt(dr4 * dr4 + dg4 * dg4 + db4 * db4));
+      }
+    }
+    if (distances.length < 5) return baseThreshold * 2.5;
+    // Compute mean and stddev
+    var sum = 0;
+    for (var di = 0; di < distances.length; di++) sum += distances[di];
+    var mean = sum / distances.length;
+    var sqSum = 0;
+    for (var di2 = 0; di2 < distances.length; di2++) {
+      var diff = distances[di2] - mean;
+      sqSum += diff * diff;
+    }
+    var stddev = Math.sqrt(sqSum / distances.length);
+    var adaptive = mean + 2 * stddev;
+    // Clamp between 1.5x and 4x of base threshold
+    var minT = baseThreshold * 1.5;
+    var maxT = baseThreshold * 4;
+    return Math.max(minT, Math.min(maxT, adaptive));
+  },
+
+  // Suppress color spill on boundary pixels by blending toward nearest foreground
+  suppressColorSpill: function(outData, mask, srcData, w, h, bgRgb) {
+    var totalPixels = w * h;
+    for (var p = 0; p < totalPixels; p++) {
+      var keepFactor = mask[p];
+      if (keepFactor <= 0.1 || keepFactor >= 0.95) continue;
+      var i = p * 4;
+      if (outData[i + 3] < 10) continue;
+
+      // Find nearest foreground pixel within 3px radius
+      var px = p % w;
+      var py = (p - px) / w;
+      var bestR = -1, bestG = -1, bestB = -1;
+      var bestDist = 100;
+      var searchR = 3;
+      for (var dy = -searchR; dy <= searchR; dy++) {
+        var ny = py + dy;
+        if (ny < 0 || ny >= h) continue;
+        for (var dx = -searchR; dx <= searchR; dx++) {
+          var nx = px + dx;
+          if (nx < 0 || nx >= w) continue;
+          var np = ny * w + nx;
+          if (mask[np] >= 0.95) {
+            var d = Math.abs(dx) + Math.abs(dy);
+            if (d < bestDist) {
+              bestDist = d;
+              var ni = np * 4;
+              bestR = srcData[ni];
+              bestG = srcData[ni + 1];
+              bestB = srcData[ni + 2];
+            }
+          }
+        }
+      }
+
+      if (bestR < 0) continue;
+
+      // Compute how "boundary" this pixel is (0 at edges of range, 1 at center)
+      var boundaryStrength = 1 - Math.abs(keepFactor - 0.5) * 2;
+      // Max 60% shift, proportional to boundary strength
+      var shift = boundaryStrength * 0.6;
+      outData[i]     = Math.round(outData[i]     + (bestR - outData[i]) * shift);
+      outData[i + 1] = Math.round(outData[i + 1] + (bestG - outData[i + 1]) * shift);
+      outData[i + 2] = Math.round(outData[i + 2] + (bestB - outData[i + 2]) * shift);
+    }
+  },
+
+  buildEdgeFloodMask: function(srcData, w, h, bgRgb, bgThreshold, edgeMap) {
+    var totalPixels = w * h;
+    var maxDist = App.bgRemoval.computeAdaptiveThreshold(srcData, w, h, bgRgb, bgThreshold);
 
     var visited = new Uint8Array(totalPixels);
     var mask = new Float32Array(totalPixels);
@@ -243,7 +383,19 @@ App.bgRemoval = {
         if (x < w - 1 && y < h - 1)   neighbors.push(p + w + 1);
         for (var ni = 0; ni < neighbors.length; ni++) {
           var np = neighbors[ni];
-          if (!visited[np]) { if (isBgPixel(np)) { visited[np] = 1; queue.push(np); } else { visited[np] = 2; } }
+          if (!visited[np]) {
+            if (isBgPixel(np)) {
+              // If edge map is provided, strong edges block flood unless pixel is very close to bg
+              if (edgeMap && edgeMap[np] > 0.4) {
+                var edgeDist = pixelDist(np);
+                if (edgeDist >= 0 && edgeDist > maxDist * 0.3) {
+                  visited[np] = 2; // blocked by edge
+                  continue;
+                }
+              }
+              visited[np] = 1; queue.push(np);
+            } else { visited[np] = 2; }
+          }
         }
       }
       return queue.length;
@@ -474,9 +626,12 @@ App.bgRemoval = {
     state.processing = true;
 
     var bgMask = null;
+    var edgeMap = null;
     if (doBgRemoval) {
+      App.utils.showProgress(5, 'Analyzing edges...');
+      edgeMap = App.bgRemoval.computeEdgeStrength(srcData, w, h);
       App.utils.showProgress(10, 'Detecting background...');
-      bgMask = App.bgRemoval.buildEdgeFloodMask(srcData, w, h, bgRgb, bgThreshold);
+      bgMask = App.bgRemoval.buildEdgeFloodMask(srcData, w, h, bgRgb, bgThreshold, edgeMap);
       if (state.edgeProtect > 0) {
         App.utils.showProgress(15, 'Protecting edges...');
         bgMask = App.bgRemoval.erodeMask(bgMask, w, h, state.edgeProtect);
@@ -501,14 +656,6 @@ App.bgRemoval = {
           var keepFactor = bgMask[p];
           if (keepFactor < 1.0) {
             a = Math.round(a * keepFactor);
-            if (a > 0 && keepFactor < 1.0) {
-              var correction = Math.min(1, keepFactor + 0.1);
-              if (correction > 0) {
-                r = Math.min(255, Math.max(0, Math.round(r / correction)));
-                g = Math.min(255, Math.max(0, Math.round(g / correction)));
-                b = Math.min(255, Math.max(0, Math.round(b / correction)));
-              }
-            }
           }
         }
 
@@ -542,6 +689,11 @@ App.bgRemoval = {
         App.utils.showProgress(pct, 'Processing... ' + pct + '%');
         requestAnimationFrame(processChunk);
       } else {
+        // Apply color spill suppression on boundary pixels
+        if (doBgRemoval && bgMask) {
+          App.bgRemoval.suppressColorSpill(outData, bgMask, srcData, w, h, bgRgb);
+        }
+
         ctx.putImageData(output, 0, 0);
 
         state._colorOnlyCanvas = null;
@@ -590,14 +742,6 @@ App.bgRemoval = {
               var keepFactor2 = bgMask[p3];
               if (keepFactor2 < 1.0) {
                 a3 = Math.round(a3 * keepFactor2);
-                if (a3 > 0) {
-                  var correction2 = Math.min(1, keepFactor2 + 0.1);
-                  if (correction2 > 0) {
-                    r3 = Math.min(255, Math.max(0, Math.round(r3 / correction2)));
-                    g3 = Math.min(255, Math.max(0, Math.round(g3 / correction2)));
-                    b3 = Math.min(255, Math.max(0, Math.round(b3 / correction2)));
-                  }
-                }
               }
             }
             bData[i3] = r3; bData[i3+1] = g3; bData[i3+2] = b3; bData[i3+3] = a3;
@@ -613,6 +757,7 @@ App.bgRemoval = {
           state.processedCanvas = upscaled;
           state.processing = false;
           App.utils.hideProgress();
+          App.utils.showToast('Upscaled to ' + upscaled.width + '\u00d7' + upscaled.height + ' (' + state.upscaleScale + 'x)', 'success');
           App.bgRemoval.renderProcessedRaster(upscaled);
         } else {
           state.processedCanvas = canvas;
@@ -635,6 +780,7 @@ App.bgRemoval = {
     if (state.compareMode !== 'final') {
       App.comparison.updateComparisonLayers();
       App.download.updateDownloadInfo();
+      App.bgRemoval.updateDimensionBadge();
       return;
     }
     var displayW = state.originalCanvas.width;
@@ -652,8 +798,23 @@ App.bgRemoval = {
     dom.processedLayer.innerHTML = '';
     dom.processedLayer.appendChild(display);
     App.download.updateDownloadInfo();
+    App.bgRemoval.updateDimensionBadge();
     if (state.brushMask) {
       App.bgRemoval.applyBrushToProcessed();
+    }
+  },
+
+  updateDimensionBadge: function() {
+    var state = App.state;
+    var dom = App.dom;
+    if (!dom.dimensionBadge) return;
+    if (state.upscale && state.processedCanvas) {
+      var pw = state.processedCanvas.width;
+      var ph = state.processedCanvas.height;
+      dom.dimensionBadge.textContent = pw + '\u00d7' + ph + ' (' + state.upscaleScale + 'x)';
+      dom.dimensionBadge.style.display = 'block';
+    } else {
+      dom.dimensionBadge.style.display = 'none';
     }
   },
 

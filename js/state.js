@@ -134,6 +134,7 @@ window.App = {
   d.mappingCount = $('mappingCount');
   d.btnColorUndo = $('btnColorUndo');
   d.btnResetColors = $('btnResetColors');
+  d.dimensionBadge = $('dimensionBadge');
   d.btnRestartTour = $('btnRestartTour');
   d.btnHelpTour = $('btnHelpTour');
 })();
