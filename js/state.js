@@ -40,6 +40,7 @@ window.App = {
     panY: 0,
     undoStack: [],      // Array of Float32Array snapshots
     redoStack: [],
+    mlReady: false,
     compareMode: 'final',
     // Intermediate canvases for comparison modes
     _colorOnlyCanvas: null,   // color replacement only (no bg removal, no upscale)

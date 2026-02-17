@@ -785,21 +785,54 @@ App.bgRemoval = {
 
     state.processing = true;
 
-    var bgMask = null;
-    var edgeMap = null;
-    if (doBgRemoval) {
+    // Build background mask — ML (async) or algorithmic (sync)
+    function buildMaskPromise() {
+      if (!doBgRemoval) return Promise.resolve(null);
+
+      // Try ML-based removal first
+      if (App.mlBgRemoval && App.mlBgRemoval.isReady()) {
+        App.utils.showProgress(5, 'AI background removal...');
+        return App.mlBgRemoval.predict(srcData, w, h).then(function(mlMask) {
+          if (thisRunId !== _currentRunId) return null;
+          // Apply erosion and blur to ML mask too for clean edges
+          if (state.edgeProtect > 0) {
+            App.utils.showProgress(15, 'Protecting edges...');
+            mlMask = App.bgRemoval.erodeMask(mlMask, w, h, state.edgeProtect);
+          }
+          App.utils.showProgress(18, 'Smoothing edges...');
+          mlMask = App.bgRemoval.blurMask(mlMask, w, h, 1);
+          return mlMask;
+        }).catch(function(err) {
+          console.warn('[BG] ML predict failed, falling back to algorithmic:', err);
+          return buildAlgorithmicMask();
+        });
+      }
+
+      // If ML model is available but not yet loaded, start loading it
+      // and fall back to algorithmic for this run
+      if (App.mlBgRemoval && App.mlBgRemoval.isAvailable() && !App.mlBgRemoval.isLoading()) {
+        App.mlBgRemoval.init().catch(function() { /* handled inside init */ });
+      }
+
+      return Promise.resolve(buildAlgorithmicMask());
+    }
+
+    function buildAlgorithmicMask() {
       App.utils.showProgress(5, 'Analyzing edges...');
-      edgeMap = App.bgRemoval.computeEdgeStrength(srcData, w, h);
+      var edgeMap = App.bgRemoval.computeEdgeStrength(srcData, w, h);
       App.utils.showProgress(10, 'Detecting background...');
-      bgMask = App.bgRemoval.buildEdgeFloodMask(srcData, w, h, bgRgb, bgThreshold, edgeMap);
+      var mask = App.bgRemoval.buildEdgeFloodMask(srcData, w, h, bgRgb, bgThreshold, edgeMap);
       if (state.edgeProtect > 0) {
         App.utils.showProgress(15, 'Protecting edges...');
-        bgMask = App.bgRemoval.erodeMask(bgMask, w, h, state.edgeProtect);
+        mask = App.bgRemoval.erodeMask(mask, w, h, state.edgeProtect);
       }
-      // Feather edges with a small Gaussian blur for smoother transitions
       App.utils.showProgress(18, 'Smoothing edges...');
-      bgMask = App.bgRemoval.blurMask(bgMask, w, h, 2);
+      mask = App.bgRemoval.blurMask(mask, w, h, 2);
+      return mask;
     }
+
+    buildMaskPromise().then(function(bgMask) {
+    if (thisRunId !== _currentRunId) return;
 
     var CHUNK = 50000;
     var idx = 0;
@@ -932,6 +965,8 @@ App.bgRemoval = {
       App.utils.showProgress(0, 'Processing...');
     }
     processChunk();
+
+    }); // end buildMaskPromise().then()
   },
 
   renderProcessedRaster: function(canvas) {

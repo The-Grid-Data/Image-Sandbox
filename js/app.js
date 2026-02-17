@@ -172,6 +172,15 @@ App.app = {
     dom.bgRemovalOptions.classList.toggle('active', state.bgRemoval);
     if (state.bgRemoval && state.fileType === 'raster' && state.originalData) {
       App.bgRemoval.autoDetectBgColor();
+      // Lazily init ML model on first bg removal toggle
+      if (App.mlBgRemoval && App.mlBgRemoval.isAvailable() && !App.mlBgRemoval.isReady() && !App.mlBgRemoval.isLoading()) {
+        App.mlBgRemoval.init().then(function() {
+          // Re-process with ML once model is loaded
+          if (state.bgRemoval && state.fileType === 'raster') {
+            applyProcessing();
+          }
+        }).catch(function() { /* fallback handled inside */ });
+      }
     }
     App.app.updateBrushToolbar();
     applyProcessing();
