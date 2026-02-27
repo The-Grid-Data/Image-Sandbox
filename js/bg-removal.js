@@ -785,35 +785,9 @@ App.bgRemoval = {
 
     state.processing = true;
 
-    // Build background mask — ML (async) or algorithmic (sync)
+    // Build background mask (algorithmic flood-fill)
     function buildMaskPromise() {
       if (!doBgRemoval) return Promise.resolve(null);
-
-      // Try ML-based removal first
-      if (App.mlBgRemoval && App.mlBgRemoval.isReady()) {
-        App.utils.showProgress(5, 'AI background removal...');
-        return App.mlBgRemoval.predict(srcData, w, h).then(function(mlMask) {
-          if (thisRunId !== _currentRunId) return null;
-          // Apply erosion and blur to ML mask too for clean edges
-          if (state.edgeProtect > 0) {
-            App.utils.showProgress(15, 'Protecting edges...');
-            mlMask = App.bgRemoval.erodeMask(mlMask, w, h, state.edgeProtect);
-          }
-          App.utils.showProgress(18, 'Smoothing edges...');
-          mlMask = App.bgRemoval.blurMask(mlMask, w, h, 1);
-          return mlMask;
-        }).catch(function(err) {
-          console.warn('[BG] ML predict failed, falling back to algorithmic:', err);
-          return buildAlgorithmicMask();
-        });
-      }
-
-      // If ML model is available but not yet loaded, start loading it
-      // and fall back to algorithmic for this run
-      if (App.mlBgRemoval && App.mlBgRemoval.isAvailable() && !App.mlBgRemoval.isLoading()) {
-        App.mlBgRemoval.init().catch(function() { /* handled inside init */ });
-      }
-
       return Promise.resolve(buildAlgorithmicMask());
     }
 
