@@ -91,6 +91,7 @@ App.canvasExport = {
     _overlayCtx = _overlayCanvas.getContext('2d');
 
     App.canvasExport._registerOverlayEvents();
+    if (type === 'icon') App.canvasExport._refreshPreviewImg();
     App.canvasExport.renderOverlay();
   },
 
@@ -217,12 +218,48 @@ App.canvasExport = {
       var fW = cr.w * t.scale;
       var fH = cr.h * t.scale;
 
-      // Dark overlay outside frame — actual image shows through the cut-out
+      // Dark overlay outside frame
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
       ctx.fillRect(0, 0, containerW, fY);
       ctx.fillRect(0, fY + fH, containerW, containerH - fY - fH);
       ctx.fillRect(0, fY, fX, fH);
       ctx.fillRect(fX + fW, fY, containerW - fX - fW, fH);
+
+      // Inside the frame: fill bg color then composite the image on top (clip to frame bounds).
+      // This makes transparent image areas show the chosen bg color, matching the actual export.
+      var srcDims = App.canvasExport._getSourceDimensions();
+      var imgX = t.offsetX;
+      var imgY = t.offsetY;
+      var imgW = srcDims.w * t.scale;
+      var imgH = srcDims.h * t.scale;
+      var bgFill = state.canvasBgColor || '#ffffff';
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(fX, fY, fW, fH);
+      ctx.clip();
+      ctx.fillStyle = bgFill;
+      ctx.fillRect(fX, fY, fW, fH);
+      if (state.fileType === 'svg' && _previewImg && _previewImg.complete && _previewImg.naturalWidth) {
+        ctx.drawImage(_previewImg, imgX, imgY, imgW, imgH);
+      } else if (state.fileType !== 'svg') {
+        var srcCanvas = state._brushedCanvas || state.processedCanvas || state.originalCanvas;
+        if (srcCanvas) ctx.drawImage(srcCanvas, imgX, imgY, imgW, imgH);
+      }
+      ctx.restore();
+
+      // Padding margin zones drawn on top of image (semi-transparent bg color shows margin area)
+      var pad = state.iconPadding || 0;
+      if (pad > 0) {
+        var padPx = fW * pad;
+        ctx.save();
+        ctx.globalAlpha = 0.6;
+        ctx.fillStyle = bgFill;
+        ctx.fillRect(fX, fY, fW, padPx);
+        ctx.fillRect(fX, fY + fH - padPx, fW, padPx);
+        ctx.fillRect(fX, fY + padPx, padPx, fH - 2 * padPx);
+        ctx.fillRect(fX + fW - padPx, fY + padPx, padPx, fH - 2 * padPx);
+        ctx.restore();
+      }
 
       // Frame border
       ctx.strokeStyle = 'rgba(0,0,0,0.7)';
@@ -231,54 +268,6 @@ App.canvasExport = {
       ctx.strokeStyle = 'rgba(255,255,255,0.95)';
       ctx.lineWidth = 2;
       ctx.strokeRect(fX, fY, fW, fH);
-
-      // Fill areas within the frame that are outside the image with background color
-      var srcDims = App.canvasExport._getSourceDimensions();
-      var imgRight = t.offsetX + srcDims.w * t.scale;
-      var imgBottom = t.offsetY + srcDims.h * t.scale;
-      var bgFill = state.canvasBgColor || '#ffffff';
-      ctx.fillStyle = bgFill;
-      // Left overhang
-      if (fX < t.offsetX) {
-        ctx.fillRect(fX, fY, Math.min(t.offsetX, fX + fW) - fX, fH);
-      }
-      // Right overhang
-      if (fX + fW > imgRight) {
-        var rxStart = Math.max(fX, imgRight);
-        ctx.fillRect(rxStart, fY, (fX + fW) - rxStart, fH);
-      }
-      // Top overhang (only within horizontal image span to avoid double-filling corners)
-      if (fY < t.offsetY) {
-        var txL = Math.max(fX, t.offsetX);
-        var txR = Math.min(fX + fW, imgRight);
-        if (txR > txL) ctx.fillRect(txL, fY, txR - txL, Math.min(t.offsetY, fY + fH) - fY);
-      }
-      // Bottom overhang
-      if (fY + fH > imgBottom) {
-        var bxL = Math.max(fX, t.offsetX);
-        var bxR = Math.min(fX + fW, imgRight);
-        var byStart = Math.max(fY, imgBottom);
-        if (bxR > bxL) ctx.fillRect(bxL, byStart, bxR - bxL, (fY + fH) - byStart);
-      }
-
-      // Filled margin zones showing the actual background padding area that will appear in export
-      var pad = state.iconPadding || 0;
-      if (pad > 0) {
-        var padPx = fW * pad;
-        var bgColor = state.canvasBgColor || '#ffffff';
-        ctx.save();
-        ctx.globalAlpha = 0.65;
-        ctx.fillStyle = bgColor;
-        // Top margin
-        ctx.fillRect(fX, fY, fW, padPx);
-        // Bottom margin
-        ctx.fillRect(fX, fY + fH - padPx, fW, padPx);
-        // Left margin (inner, excluding corners already covered)
-        ctx.fillRect(fX, fY + padPx, padPx, fH - 2 * padPx);
-        // Right margin
-        ctx.fillRect(fX + fW - padPx, fY + padPx, padPx, fH - 2 * padPx);
-        ctx.restore();
-      }
 
       // Corner resize handles
       var hs = 8;
