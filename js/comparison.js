@@ -64,6 +64,8 @@ App.comparison = {
     if (state.brushMask && (mode === 'final' || mode === 'bg' || mode === 'color')) {
       App.bgRemoval.applyBrushToProcessed();
     }
+    // Re-anchor the canvas overlay — sizer dimensions may have changed (e.g. after upscale)
+    if (state.canvasMode && App.canvasExport) App.canvasExport.renderOverlay();
   },
 
   renderCanvasToLayer: function(srcCanvas, layer, overrideW, overrideH) {

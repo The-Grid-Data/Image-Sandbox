@@ -177,11 +177,16 @@ App.canvasExport = {
   // use containerW/src.w and containerH/src.h independently — they diverge for short images.
   _getImageTransform: function() {
     var src = App.canvasExport._getSourceDimensions();
+    var state = App.state;
     var dom = App.dom;
     var containerW = dom.comparisonContent.offsetWidth || 1;
     var containerH = dom.comparisonContent.offsetHeight || 1;
     var MAX_H = 500;
-    var scale = Math.min(1, containerW / src.w, MAX_H / src.h);
+    // For upscaled rasters the sizer canvas is upscaleScale× larger, so the effective
+    // rendered size (before hitting the max constraints) is src × upscaleScale.
+    // SVGs are never raster-upscaled by the current pipeline, so upScale stays 1 for them.
+    var upScale = (state.upscale && state.fileType !== 'svg') ? (state.upscaleScale || 1) : 1;
+    var scale = Math.min(upScale, containerW / src.w, MAX_H / src.h);
     var renderedW = src.w * scale;
     var renderedH = src.h * scale;
     return {
