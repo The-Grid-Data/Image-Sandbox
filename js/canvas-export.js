@@ -142,12 +142,31 @@ App.canvasExport = {
     if (App.app && App.app.updateCanvasPanel) App.app.updateCanvasPanel();
   },
 
+  // ── Image transform: maps source-pixel coords → overlay-canvas coords ──
+  // Images render with object-fit:contain, max-height:500px, centered in the container.
+  // The container may be taller than the image (min-height:200px CSS floor), so we cannot
+  // use containerW/src.w and containerH/src.h independently — they diverge for short images.
+  _getImageTransform: function() {
+    var src = App.canvasExport._getSourceDimensions();
+    var dom = App.dom;
+    var containerW = dom.comparisonContent.offsetWidth || 1;
+    var containerH = dom.comparisonContent.offsetHeight || 1;
+    var MAX_H = 500;
+    var scale = Math.min(containerW / src.w, MAX_H / src.h);
+    var renderedW = src.w * scale;
+    var renderedH = src.h * scale;
+    return {
+      scale: scale,
+      offsetX: (containerW - renderedW) / 2,
+      offsetY: (containerH - renderedH) / 2
+    };
+  },
+
   // ── Render the crop frame overlay ──
   renderOverlay: function() {
     if (!_overlayCanvas || !_overlayCtx) return;
     var state = App.state;
     var dom = App.dom;
-    var src = App.canvasExport._getSourceDimensions();
 
     // Size the canvas to the current comparisonContent render area
     var containerW = dom.comparisonContent.offsetWidth;
@@ -160,17 +179,15 @@ App.canvasExport = {
     var ctx = _overlayCtx;
     ctx.clearRect(0, 0, containerW, containerH);
 
-    // Scale from source-pixel → screen-pixel
-    var scaleX = containerW / src.w;
-    var scaleY = containerH / src.h;
+    var t = App.canvasExport._getImageTransform();
 
     if (state.canvasMode === 'icon') {
       var cr = state.cropRect;
       if (!cr) return;
-      var fX = cr.x * scaleX;
-      var fY = cr.y * scaleY;
-      var fW = cr.w * scaleX;
-      var fH = cr.h * scaleY;
+      var fX = t.offsetX + cr.x * t.scale;
+      var fY = t.offsetY + cr.y * t.scale;
+      var fW = cr.w * t.scale;
+      var fH = cr.h * t.scale;
 
       // Dark overlay outside frame — actual image shows through the cut-out
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
@@ -186,6 +203,18 @@ App.canvasExport = {
       ctx.strokeStyle = 'rgba(255,255,255,0.95)';
       ctx.lineWidth = 2;
       ctx.strokeRect(fX, fY, fW, fH);
+
+      // Dashed inner guide showing the content zone after padding is applied
+      var pad = state.iconPadding || 0;
+      if (pad > 0) {
+        var padPx = fW * pad;
+        ctx.save();
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(fX + padPx, fY + padPx, fW - 2 * padPx, fH - 2 * padPx);
+        ctx.restore();
+      }
 
       // Corner resize handles
       var hs = 8;
@@ -208,10 +237,10 @@ App.canvasExport = {
       var cr = state.cropRect;
       if (!cr) return;
 
-      var fX = cr.x * scaleX;
-      var fY = cr.y * scaleY;
-      var fW = cr.w * scaleX;
-      var fH = cr.h * scaleY;
+      var fX = t.offsetX + cr.x * t.scale;
+      var fY = t.offsetY + cr.y * t.scale;
+      var fW = cr.w * t.scale;
+      var fH = cr.h * t.scale;
 
       // Dark overlay with cut-out (4-rect approach)
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
@@ -283,12 +312,13 @@ App.canvasExport = {
   _screenToSource: function(screenX, screenY) {
     if (!_overlayCanvas) return { x: 0, y: 0 };
     var rect = _overlayCanvas.getBoundingClientRect();
-    var src = App.canvasExport._getSourceDimensions();
-    var relX = screenX - rect.left;
-    var relY = screenY - rect.top;
+    var t = App.canvasExport._getImageTransform();
+    // rect.width may differ from offsetWidth when the CSS zoom transform is applied;
+    // use the ratio to account for any CSS scaling of the overlay canvas itself.
+    var cssScale = rect.width / (_overlayCanvas.width || rect.width);
     return {
-      x: relX * src.w / rect.width,
-      y: relY * src.h / rect.height
+      x: (screenX - rect.left - t.offsetX * cssScale) / (t.scale * cssScale),
+      y: (screenY - rect.top  - t.offsetY * cssScale) / (t.scale * cssScale)
     };
   },
 
@@ -298,14 +328,13 @@ App.canvasExport = {
     if (!state.cropRect) return null;
     if (!_overlayCanvas) return null;
     var cr = state.cropRect;
-    var src = App.canvasExport._getSourceDimensions();
     var rect = _overlayCanvas.getBoundingClientRect();
-    var scaleX = rect.width / src.w;
-    var scaleY = rect.height / src.h;
-    var fX = rect.left + cr.x * scaleX;
-    var fY = rect.top  + cr.y * scaleY;
-    var fW = cr.w * scaleX;
-    var fH = cr.h * scaleY;
+    var t = App.canvasExport._getImageTransform();
+    var cssScale = rect.width / (_overlayCanvas.width || rect.width);
+    var fX = rect.left + (t.offsetX + cr.x * t.scale) * cssScale;
+    var fY = rect.top  + (t.offsetY + cr.y * t.scale) * cssScale;
+    var fW = cr.w * t.scale * cssScale;
+    var fH = cr.h * t.scale * cssScale;
     var EDGE = 10; // px hit threshold
 
     if (screenX < fX - EDGE || screenX > fX + fW + EDGE ||
