@@ -204,15 +204,22 @@ App.canvasExport = {
       ctx.lineWidth = 2;
       ctx.strokeRect(fX, fY, fW, fH);
 
-      // Dashed inner guide showing the content zone after padding is applied
+      // Filled margin zones showing the actual background padding area that will appear in export
       var pad = state.iconPadding || 0;
       if (pad > 0) {
         var padPx = fW * pad;
+        var bgColor = state.canvasBgColor || '#ffffff';
         ctx.save();
-        ctx.setLineDash([4, 4]);
-        ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(fX + padPx, fY + padPx, fW - 2 * padPx, fH - 2 * padPx);
+        ctx.globalAlpha = 0.65;
+        ctx.fillStyle = bgColor;
+        // Top margin
+        ctx.fillRect(fX, fY, fW, padPx);
+        // Bottom margin
+        ctx.fillRect(fX, fY + fH - padPx, fW, padPx);
+        // Left margin (inner, excluding corners already covered)
+        ctx.fillRect(fX, fY + padPx, padPx, fH - 2 * padPx);
+        // Right margin
+        ctx.fillRect(fX + fW - padPx, fY + padPx, padPx, fH - 2 * padPx);
         ctx.restore();
       }
 
