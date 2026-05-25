@@ -106,6 +106,18 @@ App.canvasExport = {
       w: sqSize,
       h: sqSize
     };
+    // Zoom out so the full frame is visible — the frame may be larger than the current viewport
+    if (App.zoomPan) {
+      var t = App.canvasExport._getImageTransform();
+      var containerW = App.dom.comparisonContent.offsetWidth || 1;
+      var containerH = App.dom.comparisonContent.offsetHeight || 1;
+      var framePxW = sqSize * t.scale;
+      var framePxH = sqSize * t.scale;
+      var currentZoom = App.state.zoom || 1;
+      // Required zoom to show the full frame with 10% breathing room
+      var zoomNeeded = Math.min(currentZoom, 0.9 * Math.min(containerW / framePxW, containerH / framePxH) * currentZoom);
+      if (zoomNeeded < currentZoom) App.zoomPan.setZoom(zoomNeeded);
+    }
     App.canvasExport.renderOverlay();
   },
 
@@ -158,7 +170,8 @@ App.canvasExport = {
   },
 
   // ── Image transform: maps source-pixel coords → overlay-canvas coords ──
-  // Images render with object-fit:contain, max-height:500px, centered in the container.
+  // Images render with max-width:100%, max-height:500px — images never upscale beyond
+  // their natural size (only downscale to fit). The min(1,...) enforces that cap.
   // The container may be taller than the image (min-height:200px CSS floor), so we cannot
   // use containerW/src.w and containerH/src.h independently — they diverge for short images.
   _getImageTransform: function() {
@@ -167,7 +180,7 @@ App.canvasExport = {
     var containerW = dom.comparisonContent.offsetWidth || 1;
     var containerH = dom.comparisonContent.offsetHeight || 1;
     var MAX_H = 500;
-    var scale = Math.min(containerW / src.w, MAX_H / src.h);
+    var scale = Math.min(1, containerW / src.w, MAX_H / src.h);
     var renderedW = src.w * scale;
     var renderedH = src.h * scale;
     return {
