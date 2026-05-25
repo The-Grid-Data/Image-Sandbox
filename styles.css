@@ -1433,9 +1433,11 @@ body {
   width: 100%;
   height: 100%;
 }
-.canvas-overlay.drag-move { cursor: move; }
-.canvas-overlay.drag-ew   { cursor: ew-resize; }
-.canvas-overlay.drag-ns   { cursor: ns-resize; }
+.canvas-overlay.drag-move  { cursor: move; }
+.canvas-overlay.drag-ew    { cursor: ew-resize; }
+.canvas-overlay.drag-ns    { cursor: ns-resize; }
+.canvas-overlay.drag-nwse  { cursor: nwse-resize; }
+.canvas-overlay.drag-nesw  { cursor: nesw-resize; }
 
 /* ── Canvas panel ── */
 .canvas-type-btns { margin-bottom: 0; }

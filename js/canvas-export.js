@@ -50,22 +50,28 @@ App.canvasExport = {
 
     // For icon mode: sync padding slider display and seed the preview image
     if (type === 'icon') {
-      _previewImg = null;
       var pct = Math.round((state.iconPadding || 0.1) * 100);
       if (dom.iconPaddingSlider) dom.iconPaddingSlider.value = pct;
       if (dom.iconPaddingValue) dom.iconPaddingValue.textContent = pct;
-      if (state.fileType === 'svg') App.canvasExport._refreshPreviewImg();
     }
 
     // Initialise cropRect in source-pixel space
     var src = App.canvasExport._getSourceDimensions();
-    if (type === 'logo') {
+    if (type === 'icon') {
+      // Largest centered square — user drags/resizes to select the region to export
+      var sqSize = Math.min(src.w, src.h);
+      state.cropRect = {
+        x: Math.round((src.w - sqSize) / 2),
+        y: Math.round((src.h - sqSize) / 2),
+        w: sqSize,
+        h: sqSize
+      };
+    } else if (type === 'logo') {
       state.cropRect = { x: 0, y: 0, w: src.w, h: src.h };
     } else if (type === 'header') {
       // 3:1 centred crop, clamped to source
       var cW = Math.min(src.w, src.h * 3);
       var cH = Math.min(src.h, src.w / 3);
-      // Re-constrain: pick the dimension that fits
       if (cW / cH > 3) cW = cH * 3;
       if (cH !== 0 && cW / cH < 3) cH = cW / 3;
       state.cropRect = {
@@ -75,7 +81,6 @@ App.canvasExport = {
         h: Math.round(cH)
       };
     }
-    // Icon: no cropRect needed (full image is the source)
 
     // Create overlay inside comparisonContent (so zoom/pan transform applies automatically)
     _overlayDiv = document.createElement('div');
@@ -160,59 +165,44 @@ App.canvasExport = {
     var scaleY = containerH / src.h;
 
     if (state.canvasMode === 'icon') {
-      var pad = state.iconPadding !== undefined ? state.iconPadding : 0.1;
-      // Frame = full 512×512 icon canvas; fixed 5% margin keeps it from touching the viewer edge
-      var MARGIN = 0.05;
-      var frameSize = Math.min(containerW, containerH) * (1 - 2 * MARGIN);
-      var frameX = (containerW - frameSize) / 2;
-      var frameY = (containerH - frameSize) / 2;
+      var cr = state.cropRect;
+      if (!cr) return;
+      var fX = cr.x * scaleX;
+      var fY = cr.y * scaleY;
+      var fW = cr.w * scaleX;
+      var fH = cr.h * scaleY;
 
-      // Dark overlay outside the frame
+      // Dark overlay outside frame — actual image shows through the cut-out
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      ctx.fillRect(0, 0, containerW, containerH);
+      ctx.fillRect(0, 0, containerW, fY);
+      ctx.fillRect(0, fY + fH, containerW, containerH - fY - fH);
+      ctx.fillRect(0, fY, fX, fH);
+      ctx.fillRect(fX + fW, fY, containerW - fX - fW, fH);
 
-      // Frame background (shows the icon's background color)
-      ctx.fillStyle = state.canvasBgColor || '#ffffff';
-      ctx.fillRect(frameX, frameY, frameSize, frameSize);
-
-      // Draw the fitted content preview so it matches the actual export result
-      var previewSrc = null;
-      if (state.fileType === 'raster') {
-        previewSrc = state._brushedCanvas || state.processedCanvas || state.originalCanvas;
-      } else if (_previewImg && _previewImg.complete && _previewImg.naturalWidth > 0) {
-        previewSrc = _previewImg;
-      } else if (!_previewImg) {
-        App.canvasExport._refreshPreviewImg(); // async; re-renders when ready
-      }
-      if (previewSrc) {
-        var srcW = previewSrc.width || previewSrc.naturalWidth;
-        var srcH = previewSrc.height || previewSrc.naturalHeight;
-        var contentSize = frameSize * (1 - 2 * pad);
-        var scale = Math.min(contentSize / srcW, contentSize / srcH);
-        var sw = srcW * scale;
-        var sh = srcH * scale;
-        ctx.drawImage(previewSrc,
-          frameX + (frameSize - sw) / 2,
-          frameY + (frameSize - sh) / 2,
-          sw, sh);
-      }
-
-      // Frame border on top of content
+      // Frame border
       ctx.strokeStyle = 'rgba(0,0,0,0.7)';
       ctx.lineWidth = 4;
-      ctx.strokeRect(frameX, frameY, frameSize, frameSize);
+      ctx.strokeRect(fX, fY, fW, fH);
       ctx.strokeStyle = 'rgba(255,255,255,0.95)';
       ctx.lineWidth = 2;
-      ctx.strokeRect(frameX, frameY, frameSize, frameSize);
+      ctx.strokeRect(fX, fY, fW, fH);
+
+      // Corner resize handles
+      var hs = 8;
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.fillRect(fX - hs / 2,            fY - hs / 2,            hs, hs); // TL
+      ctx.fillRect(fX + fW - hs / 2,       fY - hs / 2,            hs, hs); // TR
+      ctx.fillRect(fX - hs / 2,            fY + fH - hs / 2,       hs, hs); // BL
+      ctx.fillRect(fX + fW - hs / 2,       fY + fH - hs / 2,       hs, hs); // BR
 
       // Label
       ctx.font = 'bold 12px sans-serif';
       ctx.textAlign = 'center';
       ctx.strokeStyle = 'rgba(0,0,0,0.8)';
       ctx.lineWidth = 3;
-      ctx.strokeText('512 × 512 (icon)', containerW / 2, frameY - 6);
+      ctx.strokeText('512 × 512 (icon)', fX + fW / 2, Math.max(12, fY - 6));
       ctx.fillStyle = 'rgba(255,255,255,0.95)';
-      ctx.fillText('512 × 512 (icon)', containerW / 2, frameY - 6);
+      ctx.fillText('512 × 512 (icon)', fX + fW / 2, Math.max(12, fY - 6));
 
     } else if (state.canvasMode === 'logo' || state.canvasMode === 'header') {
       var cr = state.cropRect;
@@ -302,10 +292,10 @@ App.canvasExport = {
     };
   },
 
-  // Returns 'interior' | 'left' | 'right' | 'top' | 'bottom' | null
+  // Returns 'interior' | 'left' | 'right' | 'top' | 'bottom' | 'corner-tl/tr/bl/br' | null
   _hitZone: function(screenX, screenY) {
     var state = App.state;
-    if (!state.cropRect || state.canvasMode === 'icon') return null;
+    if (!state.cropRect) return null;
     if (!_overlayCanvas) return null;
     var cr = state.cropRect;
     var src = App.canvasExport._getSourceDimensions();
@@ -321,6 +311,14 @@ App.canvasExport = {
     if (screenX < fX - EDGE || screenX > fX + fW + EDGE ||
         screenY < fY - EDGE || screenY > fY + fH + EDGE) {
       return null;
+    }
+    if (state.canvasMode === 'icon') {
+      var cHit = 14;
+      if (Math.abs(screenX - fX)        <= cHit && Math.abs(screenY - fY)        <= cHit) return 'corner-tl';
+      if (Math.abs(screenX - (fX + fW)) <= cHit && Math.abs(screenY - fY)        <= cHit) return 'corner-tr';
+      if (Math.abs(screenX - fX)        <= cHit && Math.abs(screenY - (fY + fH)) <= cHit) return 'corner-bl';
+      if (Math.abs(screenX - (fX + fW)) <= cHit && Math.abs(screenY - (fY + fH)) <= cHit) return 'corner-br';
+      return 'interior';
     }
     if (Math.abs(screenX - fX) <= EDGE)           return 'left';
     if (Math.abs(screenX - (fX + fW)) <= EDGE)    return 'right';
@@ -358,14 +356,16 @@ App.canvasExport = {
   _onHover: function(e) {
     if (!_overlayDiv) return;
     var zone = App.canvasExport._hitZone(e.clientX, e.clientY);
-    _overlayDiv.classList.remove('drag-move', 'drag-ew', 'drag-ns');
+    _overlayDiv.classList.remove('drag-move', 'drag-ew', 'drag-ns', 'drag-nwse', 'drag-nesw');
     if (zone === 'interior') _overlayDiv.classList.add('drag-move');
     else if (zone === 'left' || zone === 'right') _overlayDiv.classList.add('drag-ew');
     else if (zone === 'top' || zone === 'bottom') _overlayDiv.classList.add('drag-ns');
+    else if (zone === 'corner-tl' || zone === 'corner-br') _overlayDiv.classList.add('drag-nwse');
+    else if (zone === 'corner-tr' || zone === 'corner-bl') _overlayDiv.classList.add('drag-nesw');
   },
 
   _onHoverLeave: function() {
-    if (_overlayDiv) _overlayDiv.classList.remove('drag-move', 'drag-ew', 'drag-ns');
+    if (_overlayDiv) _overlayDiv.classList.remove('drag-move', 'drag-ew', 'drag-ns', 'drag-nwse', 'drag-nesw');
   },
 
   _startDrag: function(clientX, clientY) {
@@ -393,6 +393,21 @@ App.canvasExport = {
     if (ds.zone === 'interior') {
       cr.x = Math.round(o.x + dx);
       cr.y = Math.round(o.y + dy);
+      App.canvasExport._clampCropRect();
+
+    } else if (ds.zone.indexOf('corner-') === 0) {
+      // Icon mode: resize the 1:1 square; opposite corner is the anchor
+      var corner = ds.zone;
+      var anchorX = (corner === 'corner-tl' || corner === 'corner-bl') ? o.x + o.w : o.x;
+      var anchorY = (corner === 'corner-tl' || corner === 'corner-tr') ? o.y + o.h : o.y;
+      var newSize = Math.max(10, Math.max(
+        Math.abs(sp.x - anchorX),
+        Math.abs(sp.y - anchorY)
+      ));
+      cr.w = Math.round(newSize);
+      cr.h = Math.round(newSize);
+      cr.x = Math.round((corner === 'corner-tl' || corner === 'corner-bl') ? anchorX - newSize : anchorX);
+      cr.y = Math.round((corner === 'corner-tl' || corner === 'corner-tr') ? anchorY - newSize : anchorY);
       App.canvasExport._clampCropRect();
 
     } else if (ds.zone === 'left') {
@@ -545,68 +560,55 @@ App.canvasExport = {
     var iconPad = state.iconPadding !== undefined ? state.iconPadding : 0.1;
     var PAD = Math.round(512 * iconPad);
     var CONTENT = 512 - 2 * PAD;
+    var cr = state.cropRect;
+    if (!cr) return;
 
     if (state.fileType === 'svg') {
-      // SVG path
+      // Crop the SVG viewBox to the selected region, then expand outward for padding
       var svgEl = App.canvasExport._parseSVGString();
-      App.canvasExport._withLayoutSVG(svgEl, function(el) {
-        var bb = el.getBBox();
-        if (!bb || (bb.width === 0 && bb.height === 0)) {
-          // getBBox failed — fall back to imgWidth/imgHeight
-          bb = { x: 0, y: 0, width: App.state.imgWidth, height: App.state.imgHeight };
-        }
-        // Build a square viewBox centered on the content with iconPadding applied
-        var dim = Math.max(bb.width, bb.height) || 1;
-        var padFraction = iconPad / Math.max(1 - 2 * iconPad, 0.01);
-        var padVal = dim * padFraction;
-        var vbSize = dim + 2 * padVal;
-        var newVbX = bb.x + bb.width / 2 - vbSize / 2;
-        var newVbY = bb.y + bb.height / 2 - vbSize / 2;
-        var newVbW = vbSize;
-        var newVbH = vbSize;
+      var vb = App.canvasExport._parseSVGViewBox(svgEl);
+      // Convert crop rect (source-pixel space == viewBox space for SVGs) + add padding margin
+      var padSVG = iconPad > 0 ? cr.w * iconPad / (1 - 2 * iconPad) : 0;
+      var newVbX = vb.vbX + cr.x - padSVG;
+      var newVbY = vb.vbY + cr.y - padSVG;
+      var newVbSize = cr.w + 2 * padSVG;
 
-        // Add bg fill as first child
-        var ns = 'http://www.w3.org/2000/svg';
-        var rect = document.createElementNS(ns, 'rect');
-        rect.setAttribute('width', '100%');
-        rect.setAttribute('height', '100%');
-        rect.setAttribute('fill', state.canvasBgColor);
-        el.insertBefore(rect, el.firstChild);
+      var ns = 'http://www.w3.org/2000/svg';
+      var bgRect = document.createElementNS(ns, 'rect');
+      bgRect.setAttribute('width', '100%');
+      bgRect.setAttribute('height', '100%');
+      bgRect.setAttribute('fill', state.canvasBgColor);
+      svgEl.insertBefore(bgRect, svgEl.firstChild);
 
-        el.setAttribute('viewBox', newVbX + ' ' + newVbY + ' ' + newVbW + ' ' + newVbH);
-        el.setAttribute('width', '512');
-        el.setAttribute('height', '512');
+      svgEl.setAttribute('viewBox', newVbX + ' ' + newVbY + ' ' + newVbSize + ' ' + newVbSize);
+      svgEl.setAttribute('width', '512');
+      svgEl.setAttribute('height', '512');
 
-        if (state.canvasKeepSVG) {
-          var s = new XMLSerializer();
-          var str = s.serializeToString(el);
-          var blob = new Blob([str], { type: 'image/svg+xml' });
-          App.download.downloadBlob(blob, base + '_icon.svg');
-        } else {
-          // Clone is no longer in the div here (withLayoutSVG removed it)
-          // Re-clone for rasterization
-          App.canvasExport._rasterizeSVG(el, 512, 512, function(blob) {
-            App.download.downloadBlob(blob, base + '_icon.png');
-          });
-        }
-      });
+      if (state.canvasKeepSVG) {
+        var s = new XMLSerializer();
+        var str = s.serializeToString(svgEl);
+        var blob = new Blob([str], { type: 'image/svg+xml' });
+        App.download.downloadBlob(blob, base + '_icon.svg');
+      } else {
+        App.canvasExport._rasterizeSVG(svgEl, 512, 512, function(blob) {
+          App.download.downloadBlob(blob, base + '_icon.png');
+        });
+      }
 
     } else {
-      // Raster path
+      // Raster: sample the selected cropRect region, place into the padded CONTENT area
       var src = state._brushedCanvas || state.processedCanvas || state.originalCanvas;
       if (!src) return;
+      var upScale = state.upscale ? state.upscaleScale : 1;
       var canvas = document.createElement('canvas');
       canvas.width = 512;
       canvas.height = 512;
       var ctx = canvas.getContext('2d');
       ctx.fillStyle = state.canvasBgColor;
       ctx.fillRect(0, 0, 512, 512);
-      var scale = Math.min(CONTENT / src.width, CONTENT / src.height);
-      var drawW = src.width * scale;
-      var drawH = src.height * scale;
-      var drawX = PAD + (CONTENT - drawW) / 2;
-      var drawY = PAD + (CONTENT - drawH) / 2;
-      ctx.drawImage(src, drawX, drawY, drawW, drawH);
+      ctx.drawImage(src,
+        cr.x * upScale, cr.y * upScale, cr.w * upScale, cr.h * upScale,
+        PAD, PAD, CONTENT, CONTENT);
       canvas.toBlob(function(blob) {
         App.download.downloadBlob(blob, base + '_icon.png');
       }, 'image/png', 1.0);
