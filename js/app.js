@@ -63,10 +63,12 @@ App.app = {
     if (!dom.canvasPanel) return;
     var mode = state.canvasMode;
 
-    // Padding slider (icon only)
+    // Padding slider + fit button (icon only)
     if (dom.iconPaddingRow) {
       dom.iconPaddingRow.style.display = (mode === 'icon') ? '' : 'none';
     }
+    var iconFitRow = App.$('iconFitRow');
+    if (iconFitRow) iconFitRow.style.display = (mode === 'icon') ? '' : 'none';
     // Show/hide bg color row
     if (dom.canvasBgColorRow) {
       dom.canvasBgColorRow.style.display = (mode === 'icon' || (mode && state.canvasAddBg)) ? '' : 'none';
@@ -663,6 +665,12 @@ App.app = {
     dom.btnCanvasCancel.addEventListener('click', function() {
       App.canvasExport.deactivate();
       App.app.updateCanvasPanel();
+    });
+  }
+
+  if (dom.btnIconFitImage) {
+    dom.btnIconFitImage.addEventListener('click', function() {
+      App.canvasExport.fitIconToImage();
     });
   }
 

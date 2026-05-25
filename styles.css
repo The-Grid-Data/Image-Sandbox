@@ -1460,3 +1460,15 @@ body {
   transition: var(--transition);
 }
 .btn-canvas-cancel:hover { border-color: var(--accent); color: var(--text-primary); }
+
+.btn-secondary {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.btn-secondary:hover { background: var(--accent); color: #fff; }

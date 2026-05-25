@@ -94,6 +94,21 @@ App.canvasExport = {
     App.canvasExport.renderOverlay();
   },
 
+  // ── Fit icon frame to contain the full source image (centered, with bg outside image bounds) ──
+  fitIconToImage: function() {
+    var state = App.state;
+    if (state.canvasMode !== 'icon') return;
+    var src = App.canvasExport._getSourceDimensions();
+    var sqSize = Math.max(src.w, src.h);
+    state.cropRect = {
+      x: -Math.round((sqSize - src.w) / 2),
+      y: -Math.round((sqSize - src.h) / 2),
+      w: sqSize,
+      h: sqSize
+    };
+    App.canvasExport.renderOverlay();
+  },
+
   // ── Deactivate canvas mode ──
   deactivate: function() {
     var state = App.state;
@@ -203,6 +218,35 @@ App.canvasExport = {
       ctx.strokeStyle = 'rgba(255,255,255,0.95)';
       ctx.lineWidth = 2;
       ctx.strokeRect(fX, fY, fW, fH);
+
+      // Fill areas within the frame that are outside the image with background color
+      var srcDims = App.canvasExport._getSourceDimensions();
+      var imgRight = t.offsetX + srcDims.w * t.scale;
+      var imgBottom = t.offsetY + srcDims.h * t.scale;
+      var bgFill = state.canvasBgColor || '#ffffff';
+      ctx.fillStyle = bgFill;
+      // Left overhang
+      if (fX < t.offsetX) {
+        ctx.fillRect(fX, fY, Math.min(t.offsetX, fX + fW) - fX, fH);
+      }
+      // Right overhang
+      if (fX + fW > imgRight) {
+        var rxStart = Math.max(fX, imgRight);
+        ctx.fillRect(rxStart, fY, (fX + fW) - rxStart, fH);
+      }
+      // Top overhang (only within horizontal image span to avoid double-filling corners)
+      if (fY < t.offsetY) {
+        var txL = Math.max(fX, t.offsetX);
+        var txR = Math.min(fX + fW, imgRight);
+        if (txR > txL) ctx.fillRect(txL, fY, txR - txL, Math.min(t.offsetY, fY + fH) - fY);
+      }
+      // Bottom overhang
+      if (fY + fH > imgBottom) {
+        var bxL = Math.max(fX, t.offsetX);
+        var bxR = Math.min(fX + fW, imgRight);
+        var byStart = Math.max(fY, imgBottom);
+        if (bxR > bxL) ctx.fillRect(bxL, byStart, bxR - bxL, (fY + fH) - byStart);
+      }
 
       // Filled margin zones showing the actual background padding area that will appear in export
       var pad = state.iconPadding || 0;
@@ -384,12 +428,12 @@ App.canvasExport = {
     var cr = App.state.cropRect;
     var src = App.canvasExport._getSourceDimensions();
     if (App.state.canvasMode === 'icon') {
-      // Preserve the 1:1 square — clamp size first, then position only
-      var maxSize = Math.min(src.w, src.h);
+      // Preserve 1:1 square; frame may extend beyond image bounds (bg fills out-of-bounds areas)
+      var maxSize = Math.max(src.w, src.h);
       cr.w = Math.max(1, Math.min(cr.w, maxSize));
       cr.h = cr.w;
-      cr.x = Math.max(0, Math.min(cr.x, src.w - cr.w));
-      cr.y = Math.max(0, Math.min(cr.y, src.h - cr.h));
+      cr.x = Math.max(-cr.w + 10, Math.min(cr.x, src.w - 10));
+      cr.y = Math.max(-cr.h + 10, Math.min(cr.y, src.h - 10));
     } else {
       cr.w = Math.max(1, Math.min(cr.w, src.w - cr.x));
       cr.h = Math.max(1, Math.min(cr.h, src.h - cr.y));
@@ -440,23 +484,22 @@ App.canvasExport = {
       cr.x = Math.round(o.x + dx);
       cr.y = Math.round(o.y + dy);
       if (state.canvasMode === 'icon') {
-        // Position-only clamp — never touch w/h or the square breaks
-        cr.x = Math.max(0, Math.min(cr.x, src0.w - cr.w));
-        cr.y = Math.max(0, Math.min(cr.y, src0.h - cr.h));
+        // Keep at least 10px of the frame overlapping the image; out-of-bounds fills with bg
+        cr.x = Math.max(-cr.w + 10, Math.min(cr.x, src0.w - 10));
+        cr.y = Math.max(-cr.h + 10, Math.min(cr.y, src0.h - 10));
       } else {
         App.canvasExport._clampCropRect();
       }
 
     } else if (ds.zone.indexOf('corner-') === 0) {
       // Icon mode: resize the 1:1 square; opposite corner is the anchor.
-      // Pre-clamp newSize to the space available in both axes so w and h stay equal.
+      // Frame may extend beyond image bounds — out-of-bounds areas fill with bg color on export.
       var corner = ds.zone;
       var src1 = App.canvasExport._getSourceDimensions();
       var anchorX = (corner === 'corner-tl' || corner === 'corner-bl') ? o.x + o.w : o.x;
       var anchorY = (corner === 'corner-tl' || corner === 'corner-tr') ? o.y + o.h : o.y;
-      var availX  = (corner === 'corner-tl' || corner === 'corner-bl') ? anchorX            : src1.w - anchorX;
-      var availY  = (corner === 'corner-tl' || corner === 'corner-tr') ? anchorY            : src1.h - anchorY;
-      var maxSize = Math.max(10, Math.min(availX, availY));
+      // Max size: the larger source dimension (prevents absurdly huge frames)
+      var maxSize = Math.max(10, Math.max(src1.w, src1.h));
       var newSize = Math.min(
         Math.max(10, Math.max(Math.abs(sp.x - anchorX), Math.abs(sp.y - anchorY))),
         maxSize
@@ -465,7 +508,7 @@ App.canvasExport = {
       cr.h = Math.round(newSize);
       cr.x = Math.round((corner === 'corner-tl' || corner === 'corner-bl') ? anchorX - newSize : anchorX);
       cr.y = Math.round((corner === 'corner-tl' || corner === 'corner-tr') ? anchorY - newSize : anchorY);
-      // No _clampCropRect — newSize is already bounded, w === h is guaranteed
+      // No _clampCropRect — w === h is guaranteed, out-of-bounds is intentional
 
     } else if (ds.zone === 'left') {
       var newX = Math.round(o.x + dx);
@@ -663,9 +706,24 @@ App.canvasExport = {
       var ctx = canvas.getContext('2d');
       ctx.fillStyle = state.canvasBgColor;
       ctx.fillRect(0, 0, 512, 512);
-      ctx.drawImage(src,
-        cr.x * upScale, cr.y * upScale, cr.w * upScale, cr.h * upScale,
-        PAD, PAD, CONTENT, CONTENT);
+      // Compute intersection of crop region with actual source bounds (handles out-of-bounds frames)
+      var cropSX = cr.x * upScale;
+      var cropSY = cr.y * upScale;
+      var cropSW = cr.w * upScale;
+      var cropSH = cr.h * upScale;
+      var iSX = Math.max(cropSX, 0);
+      var iSY = Math.max(cropSY, 0);
+      var iSX2 = Math.min(cropSX + cropSW, src.width);
+      var iSY2 = Math.min(cropSY + cropSH, src.height);
+      if (iSX2 > iSX && iSY2 > iSY) {
+        var iSW = iSX2 - iSX;
+        var iSH = iSY2 - iSY;
+        var dX = PAD + (iSX - cropSX) / cropSW * CONTENT;
+        var dY = PAD + (iSY - cropSY) / cropSH * CONTENT;
+        var dW = iSW / cropSW * CONTENT;
+        var dH = iSH / cropSH * CONTENT;
+        ctx.drawImage(src, iSX, iSY, iSW, iSH, dX, dY, dW, dH);
+      }
       canvas.toBlob(function(blob) {
         App.download.downloadBlob(blob, base + '_icon.png');
       }, 'image/png', 1.0);

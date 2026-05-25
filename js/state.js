@@ -180,4 +180,5 @@ window.App = {
   d.iconPaddingRow = $('iconPaddingRow');
   d.iconPaddingSlider = $('iconPaddingSlider');
   d.iconPaddingValue = $('iconPaddingValue');
+  d.btnIconFitImage = $('btnIconFitImage');
 })();
