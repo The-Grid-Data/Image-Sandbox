@@ -33,33 +33,51 @@ Commit early and often:
 - When ALL criteria show `[x]`: **"RALPH COMPLETE - all criteria satisfied"**
 - If stuck 3+ times on same issue: **"RALPH GUTTER - need fresh context"**
 
+## ⚠️ THIS IS A DEPLOYMENT MIRROR — NOT THE DEV SOURCE
+
+**Development happens in:** `~/Documents/GridRepos/DataMVP-Area/apps/image-sandbox/`
+
+This repo (`The-Grid-Data/Image-Sandbox`) exists solely as a standalone Vercel deployment target.
+**Never edit files here directly.** Make changes in DataMVP-Area, then sync and deploy:
+
+```bash
+scripts/sync-from-datamvp.sh   # copies all files from DataMVP-Area
+vercel --prod                   # deploys to image-sandbox-sigma.vercel.app
+```
+
 ## Repository
-- Remote: https://github.com/wcfcarolina13/Image-Sandbox.git
+- This repo (deployment target): https://github.com/The-Grid-Data/Image-Sandbox.git
+- Dev source: https://github.com/The-Grid-Data/DataMVP-Area (under `apps/image-sandbox/`)
+- Original upstream: https://github.com/wcfcarolina13/Image-Sandbox (forked at SHA `025c2a7`)
 
 ## Architecture
 
 Multi-file structure using `window.App` global namespace (no bundler):
 
 ```
-index.html          (~215 lines — HTML shell + script/style includes)
-styles.css          (all CSS)
+index.html          — HTML shell + script/style includes
+styles.css          — all CSS
+api/
+  proxy.js          — Vercel function: proxies image URL loads (CORS workaround)
 js/
   state.js          — window.App namespace, state object, $ helper, App.dom cache
   utils.js          — showToast, showProgress, hideProgress, color math
   comparison.js     — updateComparisonLayers, renderCanvasToLayer, updateSlider
   zoom-pan.js       — setZoom, zoomToFit, applyZoomTransform, undo/redo
-  upscale.js        — upscaleCanvas, blurImageData
+  upscale.js        — upscaleCanvas, blurImageData, AI upscale (ESRGAN)
   bg-removal.js     — flood-fill mask, erosion, raster processing, brush tools
   color-replacement.js — SVG processing, replaceSVGColors, removeSVGBackgrounds
   color-detection.js   — detectSVGColors, detectRasterColors, renderSwatches
-  file-handling.js     — handleFile, loadSVG, loadRaster, resetState
+  file-handling.js     — handleFile, loadSVG, loadRaster, URL input, resetState
   download.js          — downloadSVG, downloadRaster, downloadBlob
+  canvas-export.js     — Icon 512×512 / Logo ×512px / Header 1500×500 presets, export
+  svg-editor.js        — inline SVG element select/move/resize/extract
   tutorial.js          — guided tour (first use) + help panel
   app.js               — applyProcessing dispatcher, event wiring (loaded last)
 ```
 
 ### Script Load Order (all `defer`)
-state.js → utils.js → comparison.js → zoom-pan.js → upscale.js → bg-removal.js → color-replacement.js → color-detection.js → file-handling.js → download.js → tutorial.js → app.js
+state.js → utils.js → comparison.js → zoom-pan.js → upscale.js → bg-removal.js → color-replacement.js → color-detection.js → file-handling.js → download.js → canvas-export.js → svg-editor.js → tutorial.js → app.js
 
 ### Namespace Pattern
 - `window.App` created in state.js
