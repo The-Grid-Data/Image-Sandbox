@@ -50,6 +50,18 @@ var TOUR_STEPS = [
     position: 'right'
   },
   {
+    target: 'svgEditPanel',
+    reveal: true,
+    content: '<strong>Edit SVG Elements</strong><br>SVG files only. Toggle "Edit elements" on, click a shape to select it, then use the arrow buttons to reposition or +/&minus; to resize. Ctrl+Z undoes each move. <strong>Extract as SVG</strong> saves the selected element as a standalone file. <strong>Reset all edits</strong> restores all original positions.',
+    position: 'right'
+  },
+  {
+    target: 'canvasPanel',
+    reveal: true,
+    content: '<strong>Canvas / Export</strong><br>Export your image in a specific media format: <strong>Icon 512×512</strong> fits the image into a square (use the Padding slider to control whitespace), <strong>Logo ×512px</strong> crops to a draggable frame at 512px tall, <strong>Header 1500×500</strong> sets a 3:1 banner crop. The preview updates live to show exactly what the exported file will look like.',
+    position: 'right'
+  },
+  {
     target: 'btnDownload',
     content: '<strong>Download</strong><br>When you\'re happy with the result, click here to save your image. Photos save as high-quality PNG, vector graphics stay as SVG.',
     position: 'top'

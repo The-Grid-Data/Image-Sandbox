@@ -26,6 +26,7 @@ window.App = {
     edgeProtect: 2,
     upscale: false,
     upscaleScale: 2,
+    aiUpscale: false,
     presetMode: null,   // 'white' | 'black' | 'custom' | null
     sliderPos: 50,
     previewBg: 'checker',
@@ -38,8 +39,17 @@ window.App = {
     zoom: 1,
     panX: 0,
     panY: 0,
-    undoStack: [],      // Array of Float32Array snapshots
+    undoStack: [],      // Array of Float32Array snapshots (brush mask only)
     redoStack: [],
+    svgEditHistory: [],     // Array of {el, prevTransform} for SVG editor undo
+    svgEditRedoStack: [],
+    selectedSVGEl: null,
+    canvasMode: null,       // 'icon' | 'logo' | 'header' | null
+    cropRect: null,         // {x, y, w, h} in source-image-pixel coordinates
+    canvasBgColor: '#ffffff',
+    canvasKeepSVG: false,
+    canvasAddBg: false,
+    iconPadding: 0.1,       // 0–0.40, padding fraction for icon mode
     compareMode: 'final',
     // Intermediate canvases for comparison modes
     _colorOnlyCanvas: null,   // color replacement only (no bg removal, no upscale)
@@ -61,6 +71,9 @@ window.App = {
   var d = App.dom;
   d.comparisonSizer = $('comparisonSizer');
   d.dropZone = $('dropZone');
+  d.urlInputBar = $('urlInputBar');
+  d.urlInput = $('urlInput');
+  d.btnUrlLoad = $('btnUrlLoad');
   d.fileInput = $('fileInput');
   d.editor = $('editor');
   d.fileName = $('fileName');
@@ -87,6 +100,8 @@ window.App = {
   d.bgThresholdValue = $('bgThresholdValue');
   d.upscaleToggle = $('upscaleToggle');
   d.upscaleOptions = $('upscaleOptions');
+  d.aiUpscaleToggle = $('aiUpscaleToggle');
+  d.upscaleInfo = $('upscaleInfo');
   d.comparison = $('comparison');
   d.comparisonBg = $('comparisonBg');
   d.originalLayer = $('originalLayer');
@@ -137,4 +152,32 @@ window.App = {
   d.dimensionBadge = $('dimensionBadge');
   d.btnRestartTour = $('btnRestartTour');
   d.btnHelpTour = $('btnHelpTour');
+  d.svgEditPanel = $('svgEditPanel');
+  d.svgEditToggle = $('svgEditToggle');
+  d.svgEditOptions = $('svgEditOptions');
+  d.svgEditHint = $('svgEditHint');
+  d.svgEditActions = $('svgEditActions');
+  d.btnSvgMoveLeft = $('btnSvgMoveLeft');
+  d.btnSvgMoveRight = $('btnSvgMoveRight');
+  d.btnSvgMoveUp = $('btnSvgMoveUp');
+  d.btnSvgMoveDown = $('btnSvgMoveDown');
+  d.btnSvgShrink = $('btnSvgShrink');
+  d.btnSvgGrow = $('btnSvgGrow');
+  d.btnSvgExtract = $('btnSvgExtract');
+  d.btnSvgReset = $('btnSvgReset');
+  d.canvasPanel = $('canvasPanel');
+  d.btnCanvasIcon = $('btnCanvasIcon');
+  d.btnCanvasLogo = $('btnCanvasLogo');
+  d.btnCanvasHeader = $('btnCanvasHeader');
+  d.canvasBgColorInput = $('canvasBgColor');
+  d.canvasBgHexInput = $('canvasBgHex');
+  d.canvasBgColorRow = $('canvasBgColorRow');
+  d.canvasAddBgToggle = $('canvasAddBgToggle');
+  d.canvasAddBgRow = $('canvasAddBgRow');
+  d.canvasSvgToggleRow = $('canvasSvgToggleRow');
+  d.canvasKeepSVGToggle = $('canvasKeepSVGToggle');
+  d.btnCanvasCancel = $('btnCanvasCancel');
+  d.iconPaddingRow = $('iconPaddingRow');
+  d.iconPaddingSlider = $('iconPaddingSlider');
+  d.iconPaddingValue = $('iconPaddingValue');
 })();

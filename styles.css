@@ -96,6 +96,50 @@ body {
   display: none;
 }
 
+/* URL input bar */
+.url-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.url-input-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.url-input-bar input[type="url"] {
+  flex: 1;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 6px 10px;
+  outline: none;
+  transition: border-color var(--transition);
+}
+
+.url-input-bar input[type="url"]:focus {
+  border-color: var(--accent);
+}
+
+.btn-url-load {
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 6px 14px;
+  white-space: nowrap;
+  transition: opacity var(--transition);
+}
+
+.btn-url-load:hover { opacity: 0.85; }
+
 /* Editor - hidden until image loaded */
 .editor {
   display: none;
@@ -121,6 +165,82 @@ body {
   color: var(--text-muted);
   margin-bottom: 14px;
 }
+
+/* Panel badge (e.g. SVG label in Edit Elements title) */
+.panel-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.svg-badge {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+/* SVG element editor */
+.svg-edit-options { margin-top: 10px; }
+
+.svg-edit-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 6px 0;
+}
+
+.svg-edit-actions { display: flex; flex-direction: column; gap: 8px; }
+
+.svg-edit-move-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-svg-edit {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 5px 10px;
+  transition: border-color var(--transition);
+}
+
+.btn-svg-edit:hover { border-color: var(--accent); color: var(--accent); }
+
+.btn-svg-extract {
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 7px 14px;
+  align-self: flex-start;
+  transition: opacity var(--transition);
+}
+
+.btn-svg-extract:hover { opacity: 0.85; }
+
+.btn-svg-reset {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 5px 12px;
+  margin-top: 6px;
+  align-self: flex-start;
+  transition: border-color var(--transition), color var(--transition);
+}
+.btn-svg-reset:hover { border-color: var(--accent); color: var(--accent); }
 
 /* File info bar */
 .file-info {
@@ -369,6 +489,15 @@ body {
   font-size: 13px;
   color: var(--text-secondary);
   white-space: nowrap;
+}
+
+.label-hint {
+  font-size: 11px;
+  color: var(--text-muted, #64748b);
+  font-weight: normal;
+  display: block;
+  white-space: normal;
+  margin-top: 2px;
 }
 
 .color-picker-wrap {
@@ -631,6 +760,14 @@ body {
   object-fit: contain;
 }
 
+/* Inline <svg> used by the SVG element editor — matches img sizing behaviour */
+.comparison-layer svg.svg-preview,
+.comparison-processed svg.svg-preview {
+  max-width: 100%;
+  max-height: 500px;
+  overflow: visible;
+}
+
 .comparison-processed {
   position: absolute;
   inset: 0;
@@ -655,21 +792,26 @@ body {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 4px;
-  background: var(--accent);
+  width: 2px;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(168, 85, 247, 0.65) 0px,
+    rgba(168, 85, 247, 0.65) 8px,
+    transparent 8px,
+    transparent 14px
+  );
   z-index: 20;
   cursor: col-resize;
   left: 50%;
   transform: translateX(-50%);
-  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.4);
 }
 
 .comparison-handle::before {
   content: '';
   position: absolute;
-  top: 50%;
+  top: 16px;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   width: 36px;
   height: 36px;
   background: var(--accent);
@@ -680,9 +822,9 @@ body {
 .comparison-handle::after {
   content: '\2194';
   position: absolute;
-  top: 50%;
+  top: 16px;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, 9px);
   color: #fff;
   font-size: 18px;
   font-weight: bold;
@@ -878,8 +1020,10 @@ body {
 
 /* Shortcuts popover */
 .shortcuts-popover {
-  display: none;
+  display: block;
   position: fixed;
+  top: 12px;
+  right: 12px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -892,16 +1036,35 @@ body {
   color: var(--text-secondary);
 }
 
-.shortcuts-popover.visible { display: block; }
+.shortcuts-popover.hidden { display: none; }
+
+.shortcuts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
 
 .shortcuts-popover h4 {
   font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 6px;
+  margin: 0;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+
+.shortcuts-minimize {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  transition: var(--transition);
+}
+.shortcuts-minimize:hover { color: var(--text-primary); }
 
 .shortcuts-popover kbd {
   display: inline-block;
@@ -1253,3 +1416,45 @@ body {
   border-radius: var(--radius-sm);
   box-shadow: 0 0 0 3px rgba(168,85,247,0.6), 0 0 20px rgba(168,85,247,0.25);
 }
+
+/* ── Canvas overlay ── */
+/* Overlay lives inside comparisonContent (position:relative, stacking context).
+   z-index 25 beats all siblings inside that context. comparisonHandle and
+   brushCursor are outside the context — they are hidden by activate() directly. */
+.canvas-overlay {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 25;
+  cursor: default;
+}
+.canvas-overlay canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.canvas-overlay.drag-move { cursor: move; }
+.canvas-overlay.drag-ew   { cursor: ew-resize; }
+.canvas-overlay.drag-ns   { cursor: ns-resize; }
+
+/* ── Canvas panel ── */
+.canvas-type-btns { margin-bottom: 0; }
+.btn-canvas-type.active {
+  background: #e2e8f0;
+  border-color: #e2e8f0;
+  color: #1a1a2e;
+  font-weight: 700;
+}
+.canvas-cancel-row { margin-top: 10px; }
+.btn-canvas-cancel {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.btn-canvas-cancel:hover { border-color: var(--accent); color: var(--text-primary); }

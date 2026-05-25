@@ -54,6 +54,10 @@ App.zoomPan = {
       : 'translate(' + state.panX + 'px, ' + state.panY + 'px) scale(' + z + ')';
     dom.zoomLevelEl.textContent = Math.round(z * 100) + '%';
     dom.comparison.style.overflow = z <= 1 ? 'hidden' : 'hidden';
+    // Keep handle hidden whenever canvas or SVG edit mode owns the layers
+    if (state.canvasMode || (App.svgEditor && App.svgEditor._inlineSVG)) {
+      dom.comparisonHandle.style.display = 'none';
+    }
   },
 
   pushUndo: function() {
@@ -70,23 +74,33 @@ App.zoomPan = {
     App.zoomPan.updateUndoRedoButtons();
   },
 
+  // Dispatch order: SVG element edits → brush strokes → color mappings
   undo: function() {
     var state = App.state;
-    if (state.undoStack.length === 0) return;
-    if (state.brushMask) {
-      state.redoStack.push(new Float32Array(state.brushMask));
+    if (state.svgEditHistory && state.svgEditHistory.length) {
+      App.svgEditor.undoEdit();
+      App.zoomPan.updateUndoRedoButtons();
+      return;
     }
-    state.brushMask = state.undoStack.pop();
-    App.bgRemoval.applyBrushToProcessed();
-    App.zoomPan.updateUndoRedoButtons();
+    if (state.undoStack.length) {
+      if (state.brushMask) state.redoStack.push(new Float32Array(state.brushMask));
+      state.brushMask = state.undoStack.pop();
+      App.bgRemoval.applyBrushToProcessed();
+      App.zoomPan.updateUndoRedoButtons();
+      return;
+    }
+    App.colorDetection.undoColor();
   },
 
   redo: function() {
     var state = App.state;
-    if (state.redoStack.length === 0) return;
-    if (state.brushMask) {
-      state.undoStack.push(new Float32Array(state.brushMask));
+    if (state.svgEditRedoStack && state.svgEditRedoStack.length) {
+      App.svgEditor.redoEdit();
+      App.zoomPan.updateUndoRedoButtons();
+      return;
     }
+    if (state.redoStack.length === 0) return;
+    if (state.brushMask) state.undoStack.push(new Float32Array(state.brushMask));
     state.brushMask = state.redoStack.pop();
     App.bgRemoval.applyBrushToProcessed();
     App.zoomPan.updateUndoRedoButtons();
@@ -95,8 +109,13 @@ App.zoomPan = {
   updateUndoRedoButtons: function() {
     var state = App.state;
     var dom = App.dom;
-    dom.btnUndo.style.opacity = state.undoStack.length > 0 ? '1' : '0.4';
-    dom.btnRedo.style.opacity = state.redoStack.length > 0 ? '1' : '0.4';
+    var canUndo = (state.svgEditHistory && state.svgEditHistory.length > 0) ||
+                  state.undoStack.length > 0 ||
+                  (state.colorUndoStack && state.colorUndoStack.length > 0);
+    var canRedo = (state.svgEditRedoStack && state.svgEditRedoStack.length > 0) ||
+                  state.redoStack.length > 0;
+    dom.btnUndo.style.opacity = canUndo ? '1' : '0.4';
+    dom.btnRedo.style.opacity = canRedo ? '1' : '0.4';
   },
 
   // Expose pan state for app.js event wiring

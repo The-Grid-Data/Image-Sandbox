@@ -20,6 +20,7 @@ App.fileHandling = {
     state.processing = false;
     dom.editor.classList.remove('active');
     dom.dropZone.style.display = '';
+    if (dom.urlInputBar) dom.urlInputBar.style.display = '';
     dom.originalLayer.innerHTML = '';
     dom.processedLayer.innerHTML = '';
     dom.comparisonSizer.innerHTML = '';
@@ -30,6 +31,19 @@ App.fileHandling = {
     dom.bgRemovalToggle.checked = false;
     dom.bgRemovalOptions.classList.remove('active');
     state.bgRemoval = false;
+    if (dom.svgEditToggle) { dom.svgEditToggle.checked = false; App.svgEditor.deactivate(); }
+    if (dom.svgEditPanel) dom.svgEditPanel.style.display = 'none';
+    if (App.canvasExport && App.canvasExport.deactivate) App.canvasExport.deactivate();
+    state.canvasMode = null;
+    state.cropRect = null;
+    state.canvasBgColor = '#ffffff';
+    state.canvasKeepSVG = false;
+    state.canvasAddBg = false;
+    state.iconPadding = 0.1;
+    if (dom.canvasAddBgToggle) dom.canvasAddBgToggle.checked = false;
+    if (dom.canvasKeepSVGToggle) dom.canvasKeepSVGToggle.checked = false;
+    if (dom.canvasBgColorInput) dom.canvasBgColorInput.value = '#ffffff';
+    if (dom.canvasBgHexInput) dom.canvasBgHexInput.value = '#ffffff';
     state.bgRemovalColor = '#ffffff';
     state.upscale = false;
     state.upscaleScale = 2;
@@ -41,6 +55,9 @@ App.fileHandling = {
     state.panY = 0;
     state.undoStack = [];
     state.redoStack = [];
+    state.svgEditHistory = [];
+    state.svgEditRedoStack = [];
+    state.selectedSVGEl = null;
     state.compareMode = 'final';
     state.selectiveMode = false;
     state._colorOnlyCanvas = null;
@@ -93,6 +110,11 @@ App.fileHandling = {
     var reader = new FileReader();
     reader.onload = function(e) {
       state.svgSource = e.target.result;
+      // Strip xmlns redeclarations from child elements. Figma sometimes exports
+      // xmlns="http://www.w3.org/1999/xhtml" on <path> etc., which makes browsers
+      // treat those elements as foreign XHTML and skip rendering them entirely.
+      // Only the root <svg xmlns="http://www.w3.org/2000/svg"> needs xmlns.
+      state.svgSource = state.svgSource.replace(/\s+xmlns="(?!http:\/\/www\.w3\.org\/2000\/svg)[^"]*"/g, '');
       var parser = new DOMParser();
       state.svgDoc = parser.parseFromString(state.svgSource, 'image/svg+xml');
 
@@ -160,8 +182,49 @@ App.fileHandling = {
   showEditor: function() {
     var dom = App.dom;
     dom.dropZone.style.display = 'none';
+    if (dom.urlInputBar) dom.urlInputBar.style.display = 'none';
     dom.editor.classList.add('active');
+    if (dom.svgEditPanel) dom.svgEditPanel.style.display = App.state.fileType === 'svg' ? '' : 'none';
+    if (dom.canvasPanel) dom.canvasPanel.style.display = '';
+    if (App.app && App.app.updateCanvasPanel) App.app.updateCanvasPanel();
     App.download.updateDownloadInfo();
     App.tutorial.resumeTour();
+  },
+
+  loadFromURL: function(url) {
+    // Extension-sniff fallback when Content-Type is absent or generic
+    var EXT_MIME = {
+      svg: 'image/svg+xml', png: 'image/png', jpg: 'image/jpeg',
+      jpeg: 'image/jpeg', webp: 'image/webp', avif: 'image/avif',
+      gif: 'image/gif', bmp: 'image/bmp', tiff: 'image/tiff', tif: 'image/tiff'
+    };
+
+    var proxyUrl = '/api/proxy?url=' + encodeURIComponent(url);
+    fetch(proxyUrl)
+      .then(function(res) {
+        if (res.status === 404) {
+          App.utils.showToast('URL loading requires the app to be served via vercel dev locally.', 'error');
+          return null;
+        }
+        if (!res.ok) {
+          App.utils.showToast("Couldn’t load that URL — the image may be private or unavailable.", 'error');
+          return null;
+        }
+        var contentType = res.headers.get('content-type') || '';
+        // Sniff from URL path if Content-Type is generic
+        if (!contentType.startsWith('image/')) {
+          var pathExt = url.split('?')[0].split('.').pop().toLowerCase();
+          contentType = EXT_MIME[pathExt] || 'image/png';
+        }
+        return res.blob().then(function(blob) {
+          var filename = url.split('?')[0].split('/').pop() || 'image';
+          if (!filename.includes('.')) filename += '.png';
+          var file = new File([blob], filename, { type: contentType });
+          App.fileHandling.handleFile(file);
+        });
+      })
+      .catch(function() {
+        App.utils.showToast("Couldn’t load that URL — the image may be private or unavailable.", 'error');
+      });
   },
 };

@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#a855f7">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%23a855f7'/%3E%3Cstop offset='100%25' stop-color='%23c084fc'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='6' fill='%231a1a2e'/%3E%3Ccircle cx='12' cy='16' r='7' fill='none' stroke='url(%23g)' stroke-width='2.5'/%3E%3Ccircle cx='20' cy='16' r='7' fill='none' stroke='url(%23g)' stroke-width='2.5' stroke-dasharray='4 3'/%3E%3Cpath d='M15 12v8M17 12v8' stroke='url(%23g)' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='36' fill='%231a1a2e'/%3E%3Ccircle cx='68' cy='90' r='40' fill='none' stroke='%23a855f7' stroke-width='8'/%3E%3Ccircle cx='112' cy='90' r='40' fill='none' stroke='%23c084fc' stroke-width='8' stroke-dasharray='14 10'/%3E%3Cpath d='M85 68v44M95 68v44' stroke='%23a855f7' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css?v=7">
+<link rel="stylesheet" href="styles.css?v=22">
 </head>
 <body>
 <div class="container">
@@ -24,6 +24,13 @@
     <div class="drop-zone-text">Drag &amp; drop your logo here, or <strong>click to browse</strong></div>
     <div class="drop-zone-formats">SVG, PNG, JPG, WebP, AVIF, GIF, BMP, TIFF</div>
     <input type="file" id="fileInput" accept=".svg,.png,.jpg,.jpeg,.webp,.avif,.gif,.bmp,.tiff,.tif,.ico,image/svg+xml,image/png,image/jpeg,image/webp,image/avif,image/gif,image/bmp,image/tiff,image/x-icon">
+  </div>
+
+  <!-- URL Input -->
+  <div class="url-input-bar" id="urlInputBar">
+    <span class="url-input-label">Or paste a URL:</span>
+    <input type="url" id="urlInput" placeholder="https://example.com/logo.svg" autocomplete="off" spellcheck="false">
+    <button class="btn-url-load" id="btnUrlLoad">Load</button>
   </div>
 
   <!-- Editor -->
@@ -119,7 +126,83 @@
           <button class="btn-preset btn-upscale active" data-scale="2" title="Double the image size (e.g. 200x200 becomes 400x400)">2x</button>
           <button class="btn-preset btn-upscale" data-scale="4" title="Quadruple the image size (e.g. 200x200 becomes 800x800) — takes longer">4x</button>
         </div>
-        <div class="upscale-info">Upscales using high-quality bicubic interpolation with sharpening</div>
+        <div class="toggle-row" id="aiUpscaleRow" style="margin-top:8px;margin-bottom:0;">
+          <label class="toggle" for="aiUpscaleToggle">
+            <input type="checkbox" id="aiUpscaleToggle">
+            <span class="toggle-slider"></span>
+          </label>
+          <label for="aiUpscaleToggle" title="Use AI (ESRGAN) for better quality — loads ~3 MB on first use">AI upscaling <span class="label-hint">loads ~3 MB on first use</span></label>
+        </div>
+        <div class="upscale-info" id="upscaleInfo">Bicubic interpolation with sharpening</div>
+      </div>
+    </div>
+
+    <!-- Edit SVG Elements (SVG files only) -->
+    <div class="panel" id="svgEditPanel" style="display:none;">
+      <div class="panel-title">Edit Elements <span class="panel-badge svg-badge">SVG</span></div>
+      <div class="toggle-row">
+        <label class="toggle" for="svgEditToggle">
+          <input type="checkbox" id="svgEditToggle">
+          <span class="toggle-slider"></span>
+        </label>
+        <label for="svgEditToggle" title="Click an SVG element in the preview to select it, then move, resize or extract it">Edit elements</label>
+      </div>
+      <div class="svg-edit-options" id="svgEditOptions">
+        <div class="svg-edit-hint" id="svgEditHint">Click an element in the preview to select it</div>
+        <div class="svg-edit-actions" id="svgEditActions" style="display:none;">
+          <div class="svg-edit-move-row">
+            <span class="toolbar-label">Move:</span>
+            <button class="btn-svg-edit" id="btnSvgMoveLeft" title="Move selected element left">&#9664;</button>
+            <button class="btn-svg-edit" id="btnSvgMoveRight" title="Move selected element right">&#9654;</button>
+            <button class="btn-svg-edit" id="btnSvgMoveUp" title="Move selected element up">&#9650;</button>
+            <button class="btn-svg-edit" id="btnSvgMoveDown" title="Move selected element down">&#9660;</button>
+          </div>
+          <div class="svg-edit-move-row">
+            <span class="toolbar-label">Resize:</span>
+            <button class="btn-svg-edit" id="btnSvgShrink" title="Scale down selected element">&#8722;</button>
+            <button class="btn-svg-edit" id="btnSvgGrow" title="Scale up selected element">&#43;</button>
+          </div>
+          <button class="btn-svg-extract" id="btnSvgExtract" title="Download this element as a standalone SVG file">Extract as SVG</button>
+        </div>
+        <button class="btn-svg-reset" id="btnSvgReset" title="Undo all element moves and resizes">Reset all edits</button>
+      </div>
+    </div>
+
+    <!-- Canvas / Export (always shown when editor is active) -->
+    <div class="panel" id="canvasPanel" style="display:none;">
+      <div class="panel-title">Canvas / Export</div>
+      <div class="presets canvas-type-btns">
+        <button class="btn-preset btn-canvas-type" id="btnCanvasIcon" title="Export as icon: 512×512 px, scale-to-fit with 10% padding">Icon 512×512</button>
+        <button class="btn-preset btn-canvas-type" id="btnCanvasLogo" title="Export as logo: variable width × 512 px tall, free crop frame">Logo ×512px</button>
+        <button class="btn-preset btn-canvas-type" id="btnCanvasHeader" title="Export as header: exactly 1500×500 px, 3:1 locked crop frame">Header 1500×500</button>
+      </div>
+      <div class="slider-row" id="iconPaddingRow" style="display:none;">
+        <label>Padding: <span id="iconPaddingValue">10</span>%</label>
+        <input type="range" id="iconPaddingSlider" min="0" max="40" value="10" step="1">
+      </div>
+      <div class="toggle-row" id="canvasAddBgRow" style="display:none;">
+        <label class="toggle" for="canvasAddBgToggle">
+          <input type="checkbox" id="canvasAddBgToggle">
+          <span class="toggle-slider"></span>
+        </label>
+        <label for="canvasAddBgToggle">Add background</label>
+      </div>
+      <div class="color-row" id="canvasBgColorRow" style="display:none;">
+        <label>Background color: <span class="label-hint">shows behind transparent areas</span></label>
+        <div class="color-picker-wrap">
+          <input type="color" id="canvasBgColor" value="#ffffff" title="Background fill color">
+          <input type="text" class="color-hex" id="canvasBgHex" value="#ffffff" maxlength="7" title="Background color hex code">
+        </div>
+      </div>
+      <div class="toggle-row" id="canvasSvgToggleRow" style="display:none;">
+        <label class="toggle" for="canvasKeepSVGToggle">
+          <input type="checkbox" id="canvasKeepSVGToggle">
+          <span class="toggle-slider"></span>
+        </label>
+        <label for="canvasKeepSVGToggle">Keep as SVG</label>
+      </div>
+      <div class="canvas-cancel-row" id="canvasCancelRow" style="display:none;">
+        <button class="btn-canvas-cancel" id="btnCanvasCancel">Cancel</button>
       </div>
     </div>
 
@@ -193,9 +276,12 @@
   </div>
 </div>
 
-<!-- Shortcuts popover (fixed position, outside panel to avoid overflow clipping) -->
+<!-- Shortcuts panel (fixed position, visible by default, minimize to hide) -->
 <div class="shortcuts-popover" id="shortcutsPopover">
-  <h4>Shortcuts</h4>
+  <div class="shortcuts-header">
+    <h4>Shortcuts</h4>
+    <button class="shortcuts-minimize" id="btnShortcutsMinimize" title="Minimize">&times;</button>
+  </div>
   <div><kbd>Scroll</kbd> Zoom in / out</div>
   <div><kbd>Space</kbd> + drag &mdash; Pan</div>
   <div><kbd>&#8984;/Ctrl</kbd> + <kbd>+</kbd> / <kbd>-</kbd> Zoom</div>
@@ -262,6 +348,20 @@
       <p><strong>Scroll wheel</strong> to zoom in/out. <strong>Hold Space + drag</strong> to pan around. Press <strong>Fit</strong> to reset the view.</p>
     </details>
     <details>
+      <summary>Canvas / Export</summary>
+      <p>The <strong>Canvas / Export</strong> panel lets you size and export your image for common Grid media formats. Pick a format to activate it; click the active button again to cancel.</p>
+      <p><strong>Icon 512×512</strong> — Fits the full image into a 512&times;512 square, centered. Use the <strong>Padding</strong> slider to control how much breathing room surrounds the content (0&thinsp;% fills the canvas edge-to-edge; 40&thinsp;% gives a lot of whitespace). The preview shows exactly what the exported PNG will look like at the current padding.</p>
+      <p><strong>Logo &times;512px</strong> — Exports at 512&thinsp;px tall, width determined by a draggable crop frame you can resize and reposition. Drag the left/right edges (and top/bottom for height) to set the crop region.</p>
+      <p><strong>Header 1500&times;500</strong> — A fixed 3:1 banner crop. Drag the crop frame to reposition it over your image.</p>
+      <p>All formats support a <strong>Background color</strong> fill (white by default). For SVG files, toggle <strong>Keep as SVG</strong> to download a vector file instead of a PNG.</p>
+    </details>
+    <details>
+      <summary>Edit SVG Elements</summary>
+      <p>Toggle <strong>Edit elements</strong> (SVG files only) to enter element-editing mode. Click any shape to select it, then use the arrow buttons to move it or +/&minus; to resize. Ctrl+Z undoes each change.</p>
+      <p><strong>Extract as SVG</strong> downloads the selected element as its own standalone file.</p>
+      <p><strong>Reset all edits</strong> restores every element to its original position and size.</p>
+    </details>
+    <details>
       <summary>Download</summary>
       <p>Click the Download button to save your image. Photos are saved as high-quality PNG. SVG files stay as SVG. If Selective mode is on, the download includes both the protected and processed areas.</p>
     </details>
@@ -294,17 +394,19 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- JS modules (defer = execute in order after HTML parsing) -->
-<script src="js/state.js?v=8" defer></script>
-<script src="js/utils.js?v=8" defer></script>
-<script src="js/comparison.js?v=8" defer></script>
-<script src="js/zoom-pan.js?v=8" defer></script>
-<script src="js/upscale.js?v=8" defer></script>
-<script src="js/bg-removal.js?v=8" defer></script>
-<script src="js/color-replacement.js?v=8" defer></script>
-<script src="js/color-detection.js?v=8" defer></script>
-<script src="js/file-handling.js?v=8" defer></script>
-<script src="js/download.js?v=8" defer></script>
-<script src="js/tutorial.js?v=8" defer></script>
-<script src="js/app.js?v=8" defer></script>
+<script src="js/state.js?v=22" defer></script>
+<script src="js/utils.js?v=22" defer></script>
+<script src="js/comparison.js?v=22" defer></script>
+<script src="js/zoom-pan.js?v=22" defer></script>
+<script src="js/upscale.js?v=22" defer></script>
+<script src="js/bg-removal.js?v=22" defer></script>
+<script src="js/color-replacement.js?v=22" defer></script>
+<script src="js/color-detection.js?v=22" defer></script>
+<script src="js/file-handling.js?v=22" defer></script>
+<script src="js/download.js?v=22" defer></script>
+<script src="js/canvas-export.js?v=22" defer></script>
+<script src="js/svg-editor.js?v=22" defer></script>
+<script src="js/tutorial.js?v=22" defer></script>
+<script src="js/app.js?v=22" defer></script>
 </body>
 </html>

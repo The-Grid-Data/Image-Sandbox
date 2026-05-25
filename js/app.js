@@ -2,6 +2,7 @@
 'use strict';
 
 var _processingTimer = null;
+var _bgHintShown = false;
 
 App.app = {
   applyProcessing: function() {
@@ -35,6 +36,53 @@ App.app = {
       App.bgRemoval.setBrushMode(null);
     }
   },
+
+  updateSvgEditActions: function() {
+    var state = App.state;
+    var dom = App.dom;
+    if (!dom.svgEditActions) return;
+    dom.svgEditActions.style.display = state.selectedSVGEl ? '' : 'none';
+    if (dom.svgEditHint) dom.svgEditHint.style.display = state.selectedSVGEl ? 'none' : '';
+  },
+
+  // Show a one-time hint when the user sets a non-white canvas bg on an opaque raster image
+  _hintBgRemoval: function(color) {
+    if (_bgHintShown) return;
+    var state = App.state;
+    if (state.fileType !== 'raster') return;
+    if (state.bgRemoval) return; // bg removal already on — no hint needed
+    var isNonWhite = color && color.toLowerCase() !== '#ffffff';
+    if (!isNonWhite) return;
+    _bgHintShown = true;
+    App.utils.showToast('The background color shows behind transparent areas. Use “Remove background” to make it visible through the image.', 'info');
+  },
+
+  updateCanvasPanel: function() {
+    var state = App.state;
+    var dom = App.dom;
+    if (!dom.canvasPanel) return;
+    var mode = state.canvasMode;
+
+    // Padding slider (icon only)
+    if (dom.iconPaddingRow) {
+      dom.iconPaddingRow.style.display = (mode === 'icon') ? '' : 'none';
+    }
+    // Show/hide bg color row
+    if (dom.canvasBgColorRow) {
+      dom.canvasBgColorRow.style.display = (mode === 'icon' || (mode && state.canvasAddBg)) ? '' : 'none';
+    }
+    // Show/hide Add background toggle (Logo/Header only)
+    if (dom.canvasAddBgRow) {
+      dom.canvasAddBgRow.style.display = (mode === 'logo' || mode === 'header') ? '' : 'none';
+    }
+    // Keep as SVG toggle (SVG files only, when a mode is active)
+    if (dom.canvasSvgToggleRow) {
+      dom.canvasSvgToggleRow.style.display = (mode && state.fileType === 'svg') ? '' : 'none';
+    }
+    // Cancel button row
+    var cancelRow = App.$('canvasCancelRow');
+    if (cancelRow) cancelRow.style.display = mode ? '' : 'none';
+  },
 };
 
 // ── Init: wire all events ──
@@ -58,9 +106,35 @@ App.app = {
   });
   dom.fileInput.addEventListener('change', function() { if (dom.fileInput.files.length) App.fileHandling.handleFile(dom.fileInput.files[0]); });
   dom.btnChangeFile.addEventListener('click', function() { App.fileHandling.resetState(); dom.fileInput.click(); });
+  if (dom.btnUrlLoad) {
+    dom.btnUrlLoad.addEventListener('click', function() {
+      var url = dom.urlInput.value.trim();
+      if (url) App.fileHandling.loadFromURL(url);
+    });
+  }
+  if (dom.urlInput) {
+    dom.urlInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { var url = dom.urlInput.value.trim(); if (url) App.fileHandling.loadFromURL(url); }
+    });
+  }
 
   // ── Preset events ──
+  function deactivatePreset() {
+    App.colorDetection.pushColorUndo();
+    clearPresetButtons();
+    state.presetMode = null;
+    state.colorReplacements = {};
+    state.selectedSourceColor = null;
+    dom.targetColorRow.style.display = 'none';
+    dom.toleranceRow.style.display = 'none';
+    App.colorDetection.renderSwatches();
+    App.colorDetection.updateSummary();
+    App.app.updateBrushToolbar();
+    applyProcessing();
+  }
+
   dom.presetWhite.addEventListener('click', function() {
+    if (state.presetMode === 'white') { deactivatePreset(); return; }
     App.colorDetection.pushColorUndo();
     clearPresetButtons();
     dom.presetWhite.classList.add('active');
@@ -86,6 +160,7 @@ App.app = {
   });
 
   dom.presetBlack.addEventListener('click', function() {
+    if (state.presetMode === 'black') { deactivatePreset(); return; }
     App.colorDetection.pushColorUndo();
     clearPresetButtons();
     dom.presetBlack.classList.add('active');
@@ -112,6 +187,7 @@ App.app = {
   });
 
   dom.presetCustom.addEventListener('click', function() {
+    if (state.presetMode === 'custom') { deactivatePreset(); return; }
     App.colorDetection.pushColorUndo();
     clearPresetButtons();
     dom.presetCustom.classList.add('active');
@@ -285,6 +361,33 @@ App.app = {
     });
   });
 
+  // ── AI upscale toggle ──
+  function _updateUpscaleInfo() {
+    if (dom.upscaleInfo) {
+      dom.upscaleInfo.textContent = state.aiUpscale
+        ? 'AI upscaling (ESRGAN) with bicubic fallback'
+        : 'Bicubic interpolation with sharpening';
+    }
+  }
+
+  if (dom.aiUpscaleToggle) {
+    // Restore saved preference
+    try {
+      if (localStorage.getItem('imageSandbox_aiUpscale') === '1') {
+        state.aiUpscale = true;
+        dom.aiUpscaleToggle.checked = true;
+      }
+    } catch (e) { /* localStorage unavailable */ }
+
+    dom.aiUpscaleToggle.addEventListener('change', function() {
+      state.aiUpscale = dom.aiUpscaleToggle.checked;
+      try { localStorage.setItem('imageSandbox_aiUpscale', state.aiUpscale ? '1' : '0'); } catch (e) {}
+      _updateUpscaleInfo();
+      if (state.upscale) applyProcessing();
+    });
+  }
+  _updateUpscaleInfo();
+
   // ── Preview background events ──
   document.querySelectorAll('.btn-bg').forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -326,7 +429,7 @@ App.app = {
   window.addEventListener('keyup', function(e) {
     if (e.code === 'Space') {
       App.zoomPan.setSpaceHeld(false);
-      if (!App.zoomPan.isPanning()) dom.comparison.style.cursor = state.brushMode ? 'none' : 'col-resize';
+      if (!App.zoomPan.isPanning()) dom.comparison.style.cursor = state.brushMode ? 'none' : ((App.svgEditor && App.svgEditor._inlineSVG) || state.canvasMode ? 'default' : 'col-resize');
     }
   });
 
@@ -351,7 +454,7 @@ App.app = {
   window.addEventListener('mouseup', function() {
     if (App.zoomPan.isPanning()) {
       App.zoomPan.setPanning(false);
-      dom.comparison.style.cursor = App.zoomPan.isSpaceHeld() ? 'grab' : (state.brushMode ? 'none' : 'col-resize');
+      dom.comparison.style.cursor = App.zoomPan.isSpaceHeld() ? 'grab' : (state.brushMode ? 'none' : ((App.svgEditor && App.svgEditor._inlineSVG) || state.canvasMode ? 'default' : 'col-resize'));
     }
   });
 
@@ -414,46 +517,47 @@ App.app = {
     }
   });
 
-  // ── Undo/redo ──
-  dom.btnUndo.addEventListener('click', function() {
-    // Try brush undo first, then fall back to color undo
-    if (App.state.undoStack.length) {
-      App.zoomPan.undo();
-    } else {
-      App.colorDetection.undoColor();
-    }
-  });
+  // ── Undo/redo — dispatch handled inside App.zoomPan.undo/redo (SVG → brush → color) ──
+  dom.btnUndo.addEventListener('click', function() { App.zoomPan.undo(); });
   dom.btnRedo.addEventListener('click', function() { App.zoomPan.redo(); });
   window.addEventListener('keydown', function(e) {
     if (['INPUT','SELECT'].includes(document.activeElement && document.activeElement.tagName)) return;
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-      e.preventDefault();
-      // Try brush undo first, then fall back to color undo
-      if (App.state.undoStack.length) {
-        App.zoomPan.undo();
-      } else {
-        App.colorDetection.undoColor();
-      }
-    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); App.zoomPan.undo(); }
     else if ((e.ctrlKey || e.metaKey) && (e.key === 'Z' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); App.zoomPan.redo(); }
     else if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); App.zoomPan.redo(); }
   });
 
-  // ── Shortcuts popover ──
+  // ── SVG element editor ──
+  if (dom.svgEditToggle) {
+    dom.svgEditToggle.addEventListener('change', function() {
+      if (dom.svgEditToggle.checked) {
+        App.svgEditor.init();
+      } else {
+        App.svgEditor.deactivate();
+      }
+      App.app.updateSvgEditActions();
+    });
+  }
+  if (dom.btnSvgMoveLeft)  dom.btnSvgMoveLeft.addEventListener('click',  function() { App.svgEditor.moveSelected(-10, 0); });
+  if (dom.btnSvgMoveRight) dom.btnSvgMoveRight.addEventListener('click', function() { App.svgEditor.moveSelected(10, 0); });
+  if (dom.btnSvgMoveUp)    dom.btnSvgMoveUp.addEventListener('click',    function() { App.svgEditor.moveSelected(0, -10); });
+  if (dom.btnSvgMoveDown)  dom.btnSvgMoveDown.addEventListener('click',  function() { App.svgEditor.moveSelected(0, 10); });
+  if (dom.btnSvgShrink)    dom.btnSvgShrink.addEventListener('click',    function() { App.svgEditor.resizeSelected(0.9); });
+  if (dom.btnSvgGrow)      dom.btnSvgGrow.addEventListener('click',      function() { App.svgEditor.resizeSelected(1.1); });
+  if (dom.btnSvgExtract)   dom.btnSvgExtract.addEventListener('click',   function() { App.svgEditor.extractSelected(); });
+  if (dom.btnSvgReset)     dom.btnSvgReset.addEventListener('click',     function() { App.svgEditor.resetEdits(); });
+
+  // ── Shortcuts panel (visible by default; minimize/restore) ──
   dom.btnHelp.addEventListener('click', function(e) {
     e.stopPropagation();
-    var isVisible = dom.shortcutsPopover.classList.toggle('visible');
-    if (isVisible) {
-      var rect = dom.btnHelp.getBoundingClientRect();
-      dom.shortcutsPopover.style.top = (rect.bottom + 6) + 'px';
-      dom.shortcutsPopover.style.right = (window.innerWidth - rect.right) + 'px';
-    }
+    dom.shortcutsPopover.classList.remove('hidden');
   });
-  document.addEventListener('click', function(e) {
-    if (!dom.shortcutsPopover.contains(e.target) && e.target !== dom.btnHelp) {
-      dom.shortcutsPopover.classList.remove('visible');
-    }
-  });
+  var btnShortcutsMinimize = App.$('btnShortcutsMinimize');
+  if (btnShortcutsMinimize) {
+    btnShortcutsMinimize.addEventListener('click', function() {
+      dom.shortcutsPopover.classList.add('hidden');
+    });
+  }
 
   // ── Comparison mode ──
   dom.compareModeSelect.addEventListener('change', function() {
@@ -483,21 +587,21 @@ App.app = {
 
   // ── Comparison slider drag ──
   dom.comparison.addEventListener('mousedown', function(e) {
-    if (!state.brushMode && !App.zoomPan.isSpaceHeld() && e.button !== 1) {
+    if (!state.brushMode && !App.zoomPan.isSpaceHeld() && e.button !== 1 && !(App.svgEditor && App.svgEditor._inlineSVG) && !state.canvasMode) {
       App.comparison.setDragging(true);
       App.comparison.updateSlider(e.clientX);
     }
   });
   window.addEventListener('mousemove', function(e) {
-    if (App.comparison.isDragging() && !state.brushMode) App.comparison.updateSlider(e.clientX);
+    if (App.comparison.isDragging() && !state.brushMode && !(App.svgEditor && App.svgEditor._inlineSVG) && !state.canvasMode) App.comparison.updateSlider(e.clientX);
   });
   window.addEventListener('mouseup', function() { App.comparison.setDragging(false); });
 
   dom.comparison.addEventListener('touchstart', function(e) {
-    if (!state.brushMode) { App.comparison.setDragging(true); App.comparison.updateSlider(e.touches[0].clientX); }
+    if (!state.brushMode && !(App.svgEditor && App.svgEditor._inlineSVG) && !state.canvasMode) { App.comparison.setDragging(true); App.comparison.updateSlider(e.touches[0].clientX); }
   }, { passive: true });
   window.addEventListener('touchmove', function(e) {
-    if (App.comparison.isDragging() && !state.brushMode) App.comparison.updateSlider(e.touches[0].clientX);
+    if (App.comparison.isDragging() && !state.brushMode && !(App.svgEditor && App.svgEditor._inlineSVG) && !state.canvasMode) App.comparison.updateSlider(e.touches[0].clientX);
   }, { passive: true });
   window.addEventListener('touchend', function() { App.comparison.setDragging(false); });
 
@@ -527,6 +631,84 @@ App.app = {
   // ── Color undo + Reset all colors ──
   dom.btnColorUndo.addEventListener('click', function() { App.colorDetection.undoColor(); });
   dom.btnResetColors.addEventListener('click', function() { App.colorDetection.resetAllColors(); });
+
+  // ── Canvas panel ──
+  function activateCanvasType(type) {
+    // Clicking the already-active type deselects it
+    if (state.canvasMode === type) {
+      App.canvasExport.deactivate();
+      [dom.btnCanvasIcon, dom.btnCanvasLogo, dom.btnCanvasHeader].forEach(function(b) {
+        if (b) b.classList.remove('active');
+      });
+      App.app.updateCanvasPanel();
+      return;
+    }
+    // Deactivate any currently active type first
+    if (state.canvasMode) App.canvasExport.deactivate();
+    // Remove active from all type buttons
+    [dom.btnCanvasIcon, dom.btnCanvasLogo, dom.btnCanvasHeader].forEach(function(b) {
+      if (b) b.classList.remove('active');
+    });
+    App.canvasExport.activate(type);
+    var btn = type === 'icon' ? dom.btnCanvasIcon : type === 'logo' ? dom.btnCanvasLogo : dom.btnCanvasHeader;
+    if (btn) btn.classList.add('active');
+    App.app.updateCanvasPanel();
+  }
+
+  if (dom.btnCanvasIcon)   dom.btnCanvasIcon.addEventListener('click',   function() { activateCanvasType('icon'); });
+  if (dom.btnCanvasLogo)   dom.btnCanvasLogo.addEventListener('click',   function() { activateCanvasType('logo'); });
+  if (dom.btnCanvasHeader) dom.btnCanvasHeader.addEventListener('click', function() { activateCanvasType('header'); });
+
+  if (dom.btnCanvasCancel) {
+    dom.btnCanvasCancel.addEventListener('click', function() {
+      App.canvasExport.deactivate();
+      App.app.updateCanvasPanel();
+    });
+  }
+
+  if (dom.iconPaddingSlider) {
+    dom.iconPaddingSlider.addEventListener('input', function() {
+      state.iconPadding = dom.iconPaddingSlider.value / 100;
+      if (dom.iconPaddingValue) dom.iconPaddingValue.textContent = dom.iconPaddingSlider.value;
+      App.canvasExport.renderOverlay();
+    });
+  }
+
+  if (dom.canvasAddBgToggle) {
+    dom.canvasAddBgToggle.addEventListener('change', function() {
+      state.canvasAddBg = dom.canvasAddBgToggle.checked;
+      App.app.updateCanvasPanel();
+      App.canvasExport.renderOverlay();
+    });
+  }
+
+  if (dom.canvasKeepSVGToggle) {
+    dom.canvasKeepSVGToggle.addEventListener('change', function() {
+      state.canvasKeepSVG = dom.canvasKeepSVGToggle.checked;
+    });
+  }
+
+  if (dom.canvasBgColorInput) {
+    dom.canvasBgColorInput.addEventListener('input', function() {
+      state.canvasBgColor = dom.canvasBgColorInput.value;
+      if (dom.canvasBgHexInput) dom.canvasBgHexInput.value = dom.canvasBgColorInput.value;
+      App.canvasExport.renderOverlay();
+      App.app._hintBgRemoval(state.canvasBgColor);
+    });
+  }
+
+  if (dom.canvasBgHexInput) {
+    dom.canvasBgHexInput.addEventListener('change', function() {
+      var val = dom.canvasBgHexInput.value.trim();
+      if (!val.startsWith('#')) val = '#' + val;
+      if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+        state.canvasBgColor = val.toLowerCase();
+        if (dom.canvasBgColorInput) dom.canvasBgColorInput.value = val;
+        App.canvasExport.renderOverlay();
+        App.app._hintBgRemoval(state.canvasBgColor);
+      }
+    });
+  }
 
   // Auto-start tour on first visit
   if (App.tutorial.shouldShowTour()) {

@@ -62,6 +62,10 @@ App.colorReplacement = {
 
     state._processedSVG = svgStr;
     App.download.updateDownloadInfo();
+    // Refresh icon preview when SVG content changes
+    if (App.state.canvasMode === 'icon' && App.canvasExport) {
+      App.canvasExport._refreshPreviewImg();
+    }
   },
 
   replaceSVGColors: function(node, source, target) {

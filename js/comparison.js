@@ -86,6 +86,7 @@ App.comparison = {
   },
 
   updateSlider: function(clientX) {
+    if ((App.svgEditor && App.svgEditor._inlineSVG) || App.state.canvasMode) return;
     var state = App.state;
     var dom = App.dom;
     var rect = dom.comparison.getBoundingClientRect();

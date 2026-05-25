@@ -111,7 +111,8 @@ App.bgRemoval = {
       dom.originalLayer.style.clipPath = 'inset(0 100% 0 0)';
       dom.processedLayer.style.clipPath = 'inset(0)';
       dom.comparisonHandle.style.display = 'none';
-    } else {
+    } else if (!(App.svgEditor && App.svgEditor._inlineSVG) && !state.canvasMode) {
+      // Don't restore comparison state while SVG edit or canvas export owns the layers
       var pct = state.sliderPos;
       dom.originalLayer.style.clipPath = 'inset(0 ' + (100 - pct) + '% 0 0)';
       dom.processedLayer.style.clipPath = 'inset(0 0 0 ' + pct + '%)';
@@ -920,12 +921,20 @@ App.bgRemoval = {
         state._preUpscaleCanvas = canvas;
 
         if (state.upscale) {
-          var upscaled = App.upscale.upscaleCanvas(canvas, state.upscaleScale);
-          state.processedCanvas = upscaled;
-          state.processing = false;
-          App.utils.hideProgress();
-          App.utils.showToast('Upscaled to ' + upscaled.width + '\u00d7' + upscaled.height + ' (' + state.upscaleScale + 'x)', 'success');
-          App.bgRemoval.renderProcessedRaster(upscaled);
+          App.upscale.upscaleCanvasSmart(canvas, state.upscaleScale)
+            .then(function(upscaled) {
+              state.processedCanvas = upscaled;
+              state.processing = false;
+              App.utils.hideProgress();
+              var method = App.state.aiUpscale ? 'AI-upscaled' : 'Upscaled';
+              App.utils.showToast(method + ' to ' + upscaled.width + '\u00d7' + upscaled.height + ' (' + state.upscaleScale + 'x)', 'success');
+              App.bgRemoval.renderProcessedRaster(upscaled);
+            })
+            .catch(function(err) {
+              state.processing = false;
+              App.utils.hideProgress();
+              App.utils.showToast('Upscale failed: ' + (err && err.message || err), 'error');
+            });
         } else {
           state.processedCanvas = canvas;
           state.processing = false;
@@ -950,10 +959,11 @@ App.bgRemoval = {
       App.comparison.updateComparisonLayers();
       App.download.updateDownloadInfo();
       App.bgRemoval.updateDimensionBadge();
+      if (state.canvasMode && App.canvasExport) App.canvasExport.renderOverlay();
       return;
     }
-    var displayW = state.originalCanvas.width;
-    var displayH = state.originalCanvas.height;
+    var displayW = canvas.width;
+    var displayH = canvas.height;
     var display = document.createElement('canvas');
     display.width = displayW;
     display.height = displayH;
@@ -961,9 +971,7 @@ App.bgRemoval = {
     display.style.maxHeight = '500px';
     display.style.objectFit = 'contain';
     var ctx = display.getContext('2d');
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(canvas, 0, 0, displayW, displayH);
+    ctx.drawImage(canvas, 0, 0);
     dom.processedLayer.innerHTML = '';
     dom.processedLayer.appendChild(display);
     App.download.updateDownloadInfo();
@@ -971,6 +979,7 @@ App.bgRemoval = {
     if (state.brushMask) {
       App.bgRemoval.applyBrushToProcessed();
     }
+    if (state.canvasMode && App.canvasExport) App.canvasExport.renderOverlay();
   },
 
   updateDimensionBadge: function() {

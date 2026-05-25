@@ -18,6 +18,8 @@ App.download = {
 
   downloadSVG: function() {
     var state = App.state;
+    if (state.canvasMode === 'icon') { App.canvasExport.exportIcon(); return; }
+    if (state.canvasMode === 'logo' || state.canvasMode === 'header') { App.canvasExport.exportCrop(); return; }
     var svgStr = state._processedSVG || state.svgSource;
     var blob = new Blob([svgStr], { type: 'image/svg+xml' });
     App.download.downloadBlob(blob, state.fileName.replace(/\.svg$/i, '') + '_modified.svg');
@@ -25,6 +27,8 @@ App.download = {
 
   downloadRaster: function() {
     var state = App.state;
+    if (state.canvasMode === 'icon') { App.canvasExport.exportIcon(); return; }
+    if (state.canvasMode === 'logo' || state.canvasMode === 'header') { App.canvasExport.exportCrop(); return; }
     var processed = state._brushedCanvas || state.processedCanvas || state.originalCanvas;
     if (!processed) return;
 
