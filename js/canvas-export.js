@@ -376,10 +376,19 @@ App.canvasExport = {
   _clampCropRect: function() {
     var cr = App.state.cropRect;
     var src = App.canvasExport._getSourceDimensions();
-    cr.w = Math.max(1, Math.min(cr.w, src.w - cr.x));
-    cr.h = Math.max(1, Math.min(cr.h, src.h - cr.y));
-    cr.x = Math.max(0, Math.min(cr.x, src.w - cr.w));
-    cr.y = Math.max(0, Math.min(cr.y, src.h - cr.h));
+    if (App.state.canvasMode === 'icon') {
+      // Preserve the 1:1 square — clamp size first, then position only
+      var maxSize = Math.min(src.w, src.h);
+      cr.w = Math.max(1, Math.min(cr.w, maxSize));
+      cr.h = cr.w;
+      cr.x = Math.max(0, Math.min(cr.x, src.w - cr.w));
+      cr.y = Math.max(0, Math.min(cr.y, src.h - cr.h));
+    } else {
+      cr.w = Math.max(1, Math.min(cr.w, src.w - cr.x));
+      cr.h = Math.max(1, Math.min(cr.h, src.h - cr.y));
+      cr.x = Math.max(0, Math.min(cr.x, src.w - cr.w));
+      cr.y = Math.max(0, Math.min(cr.y, src.h - cr.h));
+    }
   },
 
   _onHover: function(e) {
@@ -420,24 +429,36 @@ App.canvasExport = {
     var cr = state.cropRect;
 
     if (ds.zone === 'interior') {
+      var src0 = App.canvasExport._getSourceDimensions();
       cr.x = Math.round(o.x + dx);
       cr.y = Math.round(o.y + dy);
-      App.canvasExport._clampCropRect();
+      if (state.canvasMode === 'icon') {
+        // Position-only clamp — never touch w/h or the square breaks
+        cr.x = Math.max(0, Math.min(cr.x, src0.w - cr.w));
+        cr.y = Math.max(0, Math.min(cr.y, src0.h - cr.h));
+      } else {
+        App.canvasExport._clampCropRect();
+      }
 
     } else if (ds.zone.indexOf('corner-') === 0) {
-      // Icon mode: resize the 1:1 square; opposite corner is the anchor
+      // Icon mode: resize the 1:1 square; opposite corner is the anchor.
+      // Pre-clamp newSize to the space available in both axes so w and h stay equal.
       var corner = ds.zone;
+      var src1 = App.canvasExport._getSourceDimensions();
       var anchorX = (corner === 'corner-tl' || corner === 'corner-bl') ? o.x + o.w : o.x;
       var anchorY = (corner === 'corner-tl' || corner === 'corner-tr') ? o.y + o.h : o.y;
-      var newSize = Math.max(10, Math.max(
-        Math.abs(sp.x - anchorX),
-        Math.abs(sp.y - anchorY)
-      ));
+      var availX  = (corner === 'corner-tl' || corner === 'corner-bl') ? anchorX            : src1.w - anchorX;
+      var availY  = (corner === 'corner-tl' || corner === 'corner-tr') ? anchorY            : src1.h - anchorY;
+      var maxSize = Math.max(10, Math.min(availX, availY));
+      var newSize = Math.min(
+        Math.max(10, Math.max(Math.abs(sp.x - anchorX), Math.abs(sp.y - anchorY))),
+        maxSize
+      );
       cr.w = Math.round(newSize);
       cr.h = Math.round(newSize);
       cr.x = Math.round((corner === 'corner-tl' || corner === 'corner-bl') ? anchorX - newSize : anchorX);
       cr.y = Math.round((corner === 'corner-tl' || corner === 'corner-tr') ? anchorY - newSize : anchorY);
-      App.canvasExport._clampCropRect();
+      // No _clampCropRect — newSize is already bounded, w === h is guaranteed
 
     } else if (ds.zone === 'left') {
       var newX = Math.round(o.x + dx);
