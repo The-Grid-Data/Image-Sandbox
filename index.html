@@ -172,13 +172,9 @@
     <div class="panel" id="canvasPanel" style="display:none;">
       <div class="panel-title">Canvas / Export</div>
       <div class="presets canvas-type-btns">
-        <button class="btn-preset btn-canvas-type" id="btnCanvasIcon" title="Export as icon: 512×512 px, scale-to-fit with 10% padding">Icon 512×512</button>
+        <button class="btn-preset btn-canvas-type" id="btnCanvasIcon" title="Export as icon: 512×512 px — drag the crop frame to frame your content">Icon 512×512</button>
         <button class="btn-preset btn-canvas-type" id="btnCanvasLogo" title="Export as logo: variable width × 512 px tall, free crop frame">Logo ×512px</button>
         <button class="btn-preset btn-canvas-type" id="btnCanvasHeader" title="Export as header: exactly 1500×500 px, 3:1 locked crop frame">Header 1500×500</button>
-      </div>
-      <div class="slider-row" id="iconPaddingRow" style="display:none;">
-        <label title="Adds background color space around your selection in the exported 512×512 image">Background margin: <span id="iconPaddingValue">10</span>%</label>
-        <input type="range" id="iconPaddingSlider" min="0" max="25" value="10" step="1">
       </div>
       <div class="canvas-cancel-row" id="iconFitRow" style="display:none;">
         <button class="btn-secondary" id="btnIconFitImage" title="Expand the crop frame to contain the entire image — background fills the surrounding area">Fit full image</button>
@@ -353,7 +349,7 @@
     <details>
       <summary>Canvas / Export</summary>
       <p>The <strong>Canvas / Export</strong> panel lets you size and export your image for common Grid media formats. Pick a format to activate it; click the active button again to cancel.</p>
-      <p><strong>Icon 512×512</strong> — Fits the full image into a 512&times;512 square, centered. Use the <strong>Padding</strong> slider to control how much breathing room surrounds the content (0&thinsp;% fills the canvas edge-to-edge; 40&thinsp;% gives a lot of whitespace). The preview shows exactly what the exported PNG will look like at the current padding.</p>
+      <p><strong>Icon 512×512</strong> — Fits the full image into a 512&times;512 square. Drag and resize the crop frame to frame your content. <strong>Logo &times;512px</strong> and <strong>Header 1500&times;500</strong> work the same way. Use the <strong>Background margin</strong> slider to add breathing room around the content in any mode.</p>
       <p><strong>Logo &times;512px</strong> — Exports at 512&thinsp;px tall, width determined by a draggable crop frame you can resize and reposition. Drag the left/right edges (and top/bottom for height) to set the crop region.</p>
       <p><strong>Header 1500&times;500</strong> — A fixed 3:1 banner crop. Drag the crop frame to reposition it over your image.</p>
       <p>All formats support a <strong>Background color</strong> fill (white by default). For SVG files, toggle <strong>Keep as SVG</strong> to download a vector file instead of a PNG.</p>

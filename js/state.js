@@ -49,7 +49,6 @@ window.App = {
     canvasBgColor: '#ffffff',
     canvasKeepSVG: false,
     canvasAddBg: false,
-    iconPadding: 0.1,       // 0–0.40, padding fraction for icon mode
     compareMode: 'final',
     // Intermediate canvases for comparison modes
     _colorOnlyCanvas: null,   // color replacement only (no bg removal, no upscale)
@@ -177,8 +176,5 @@ window.App = {
   d.canvasSvgToggleRow = $('canvasSvgToggleRow');
   d.canvasKeepSVGToggle = $('canvasKeepSVGToggle');
   d.btnCanvasCancel = $('btnCanvasCancel');
-  d.iconPaddingRow = $('iconPaddingRow');
-  d.iconPaddingSlider = $('iconPaddingSlider');
-  d.iconPaddingValue = $('iconPaddingValue');
   d.btnIconFitImage = $('btnIconFitImage');
 })();

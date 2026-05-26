@@ -48,13 +48,6 @@ App.canvasExport = {
     // Set mode
     state.canvasMode = type;
 
-    // For icon mode: sync padding slider display and seed the preview image
-    if (type === 'icon') {
-      var pct = Math.round((state.iconPadding || 0.1) * 100);
-      if (dom.iconPaddingSlider) dom.iconPaddingSlider.value = pct;
-      if (dom.iconPaddingValue) dom.iconPaddingValue.textContent = pct;
-    }
-
     // Initialise cropRect in source-pixel space
     var src = App.canvasExport._getSourceDimensions();
     if (type === 'icon') {
@@ -82,16 +75,60 @@ App.canvasExport = {
       };
     }
 
-    // Create overlay inside comparisonContent (so zoom/pan transform applies automatically)
+    // Create overlay on the outer viewport (comparison), not comparisonContent.
+    // The overlay covers the viewport in screen space; all drawing uses explicit world→screen coords.
     _overlayDiv = document.createElement('div');
     _overlayDiv.className = 'canvas-overlay';
     _overlayCanvas = document.createElement('canvas');
     _overlayDiv.appendChild(_overlayCanvas);
-    dom.comparisonContent.appendChild(_overlayDiv);
+    dom.comparison.appendChild(_overlayDiv);
     _overlayCtx = _overlayCanvas.getContext('2d');
 
     App.canvasExport._registerOverlayEvents();
     if (type === 'icon') App.canvasExport._refreshPreviewImg();
+    App.canvasExport.renderOverlay();
+    App.canvasExport.fitToCanvasFrame();
+  },
+
+  // ── Zoom/pan so the crop frame + image are both fully visible with margin ──
+  fitToCanvasFrame: function() {
+    if (!App.state.canvasMode || !App.state.cropRect) return;
+    var t = App.canvasExport._getImageTransform();
+    var cr = App.state.cropRect;
+    var dom = App.dom;
+    var containerW = dom.comparison.offsetWidth || 1;
+    var containerH = dom.comparison.offsetHeight || 1;
+
+    // Bounding box of image union crop frame in overlay-canvas pixels
+    var imgX1 = t.offsetX, imgY1 = t.offsetY;
+    var imgX2 = t.offsetX + App.state.imgWidth * t.scale;
+    var imgY2 = t.offsetY + App.state.imgHeight * t.scale;
+    var frX1 = t.offsetX + cr.x * t.scale;
+    var frY1 = t.offsetY + cr.y * t.scale;
+    var frX2 = t.offsetX + (cr.x + cr.w) * t.scale;
+    var frY2 = t.offsetY + (cr.y + cr.h) * t.scale;
+    var bX1 = Math.min(imgX1, frX1), bY1 = Math.min(imgY1, frY1);
+    var bX2 = Math.max(imgX2, frX2), bY2 = Math.max(imgY2, frY2);
+    var bW = bX2 - bX1, bH = bY2 - bY1;
+    var bcX = (bX1 + bX2) / 2, bcY = (bY1 + bY2) / 2;
+
+    // Zoom to fit bounds with 20% margin; don't zoom in beyond the normal fit
+    var MARGIN = 0.20;
+    var fitW = containerW / (bW || 1);
+    var fitH = containerH / (bH || 1);
+    var Z = Math.min(fitW, fitH) * (1 - 2 * MARGIN);
+    Z = Math.max(0.05, Math.min(Z, 1));
+
+    // Pan to center the bounding box: for CSS transform translate(pX,pY) scale(Z)
+    // with transform-origin: 0 0, content point (cx,cy) lands at screen = cx*Z + pX.
+    // Solving for screen = containerW/2: pX = containerW/2 - cx*Z
+    var pX = containerW / 2 - bcX * Z;
+    var pY = containerH / 2 - bcY * Z;
+
+    App.state.zoom = Z;
+    App.state.panX = pX;
+    App.state.panY = pY;
+    App.zoomPan.applyZoomTransform();
     App.canvasExport.renderOverlay();
   },
 
@@ -197,14 +234,16 @@ App.canvasExport = {
   },
 
   // ── Render the crop frame overlay ──
+  // The overlay canvas is a child of dom.comparison (the viewport), so all drawing
+  // uses explicit world→screen coordinates rather than relying on CSS transform.
   renderOverlay: function() {
     if (!_overlayCanvas || !_overlayCtx) return;
     var state = App.state;
     var dom = App.dom;
 
-    // Size the canvas to the current comparisonContent render area
-    var containerW = dom.comparisonContent.offsetWidth;
-    var containerH = dom.comparisonContent.offsetHeight;
+    // Size the canvas to the outer viewport (comparison), NOT comparisonContent
+    var containerW = dom.comparison.offsetWidth;
+    var containerH = dom.comparison.offsetHeight;
     if (!containerW || !containerH) return;
 
     _overlayCanvas.width = containerW;
@@ -214,14 +253,24 @@ App.canvasExport = {
     ctx.clearRect(0, 0, containerW, containerH);
 
     var t = App.canvasExport._getImageTransform();
+    var Z  = App.state.zoom  || 1;
+    var panX = App.state.panX || 0;
+    var panY = App.state.panY || 0;
+
+    // Convert image-space coords to screen-space using: screen = content * Z + pan
+    var srcDims = App.canvasExport._getSourceDimensions();
+    var imgX = t.offsetX * Z + panX;
+    var imgY = t.offsetY * Z + panY;
+    var imgW = srcDims.w * t.scale * Z;
+    var imgH = srcDims.h * t.scale * Z;
 
     if (state.canvasMode === 'icon') {
       var cr = state.cropRect;
       if (!cr) return;
-      var fX = t.offsetX + cr.x * t.scale;
-      var fY = t.offsetY + cr.y * t.scale;
-      var fW = cr.w * t.scale;
-      var fH = cr.h * t.scale;
+      var fX = (t.offsetX + cr.x * t.scale) * Z + panX;
+      var fY = (t.offsetY + cr.y * t.scale) * Z + panY;
+      var fW = cr.w * t.scale * Z;
+      var fH = cr.h * t.scale * Z;
 
       // Dark overlay outside frame
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
@@ -232,11 +281,6 @@ App.canvasExport = {
 
       // Inside the frame: fill bg color then composite the image on top (clip to frame bounds).
       // This makes transparent image areas show the chosen bg color, matching the actual export.
-      var srcDims = App.canvasExport._getSourceDimensions();
-      var imgX = t.offsetX;
-      var imgY = t.offsetY;
-      var imgW = srcDims.w * t.scale;
-      var imgH = srcDims.h * t.scale;
       var bgFill = state.canvasBgColor || '#ffffff';
       ctx.save();
       ctx.beginPath();
@@ -251,20 +295,6 @@ App.canvasExport = {
         if (srcCanvas) ctx.drawImage(srcCanvas, imgX, imgY, imgW, imgH);
       }
       ctx.restore();
-
-      // Padding margin zones drawn on top of image (semi-transparent bg color shows margin area)
-      var pad = state.iconPadding || 0;
-      if (pad > 0) {
-        var padPx = fW * pad;
-        ctx.save();
-        ctx.globalAlpha = 0.6;
-        ctx.fillStyle = bgFill;
-        ctx.fillRect(fX, fY, fW, padPx);
-        ctx.fillRect(fX, fY + fH - padPx, fW, padPx);
-        ctx.fillRect(fX, fY + padPx, padPx, fH - 2 * padPx);
-        ctx.fillRect(fX + fW - padPx, fY + padPx, padPx, fH - 2 * padPx);
-        ctx.restore();
-      }
 
       // Frame border
       ctx.strokeStyle = 'rgba(0,0,0,0.7)';
@@ -295,10 +325,10 @@ App.canvasExport = {
       var cr = state.cropRect;
       if (!cr) return;
 
-      var fX = t.offsetX + cr.x * t.scale;
-      var fY = t.offsetY + cr.y * t.scale;
-      var fW = cr.w * t.scale;
-      var fH = cr.h * t.scale;
+      var fX = (t.offsetX + cr.x * t.scale) * Z + panX;
+      var fY = (t.offsetY + cr.y * t.scale) * Z + panY;
+      var fW = cr.w * t.scale * Z;
+      var fH = cr.h * t.scale * Z;
 
       // Dark overlay with cut-out (4-rect approach)
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
@@ -369,14 +399,14 @@ App.canvasExport = {
   // ── Coordinate helpers ──
   _screenToSource: function(screenX, screenY) {
     if (!_overlayCanvas) return { x: 0, y: 0 };
-    var rect = _overlayCanvas.getBoundingClientRect();
-    var t = App.canvasExport._getImageTransform();
-    // rect.width may differ from offsetWidth when the CSS zoom transform is applied;
-    // use the ratio to account for any CSS scaling of the overlay canvas itself.
-    var cssScale = rect.width / (_overlayCanvas.width || rect.width);
+    var rect = App.dom.comparison.getBoundingClientRect();
+    var t  = App.canvasExport._getImageTransform();
+    var Z  = App.state.zoom  || 1;
+    var pX = App.state.panX  || 0;
+    var pY = App.state.panY  || 0;
     return {
-      x: (screenX - rect.left - t.offsetX * cssScale) / (t.scale * cssScale),
-      y: (screenY - rect.top  - t.offsetY * cssScale) / (t.scale * cssScale)
+      x: ((screenX - rect.left - pX) / Z - t.offsetX) / t.scale,
+      y: ((screenY - rect.top  - pY) / Z - t.offsetY) / t.scale
     };
   },
 
@@ -386,13 +416,15 @@ App.canvasExport = {
     if (!state.cropRect) return null;
     if (!_overlayCanvas) return null;
     var cr = state.cropRect;
-    var rect = _overlayCanvas.getBoundingClientRect();
-    var t = App.canvasExport._getImageTransform();
-    var cssScale = rect.width / (_overlayCanvas.width || rect.width);
-    var fX = rect.left + (t.offsetX + cr.x * t.scale) * cssScale;
-    var fY = rect.top  + (t.offsetY + cr.y * t.scale) * cssScale;
-    var fW = cr.w * t.scale * cssScale;
-    var fH = cr.h * t.scale * cssScale;
+    var rect = App.dom.comparison.getBoundingClientRect();
+    var t    = App.canvasExport._getImageTransform();
+    var Z    = App.state.zoom  || 1;
+    var pX   = App.state.panX  || 0;
+    var pY   = App.state.panY  || 0;
+    var fX   = rect.left + (t.offsetX + cr.x * t.scale) * Z + pX;
+    var fY   = rect.top  + (t.offsetY + cr.y * t.scale) * Z + pY;
+    var fW   = cr.w * t.scale * Z;
+    var fH   = cr.h * t.scale * Z;
     var EDGE = 10; // px hit threshold
 
     if (screenX < fX - EDGE || screenX > fX + fW + EDGE ||
@@ -433,19 +465,14 @@ App.canvasExport = {
 
   _clampCropRect: function() {
     var cr = App.state.cropRect;
-    var src = App.canvasExport._getSourceDimensions();
+    // Infinite canvas: no position constraints — the frame can be dragged anywhere.
+    // Only enforce minimum size to keep the frame interactive.
     if (App.state.canvasMode === 'icon') {
-      // Preserve 1:1 square; frame may extend beyond image bounds (bg fills out-of-bounds areas)
-      var maxSize = Math.max(src.w, src.h);
-      cr.w = Math.max(1, Math.min(cr.w, maxSize));
+      cr.w = Math.max(10, cr.w);
       cr.h = cr.w;
-      cr.x = Math.max(-cr.w + 10, Math.min(cr.x, src.w - 10));
-      cr.y = Math.max(-cr.h + 10, Math.min(cr.y, src.h - 10));
     } else {
-      cr.w = Math.max(1, Math.min(cr.w, src.w - cr.x));
-      cr.h = Math.max(1, Math.min(cr.h, src.h - cr.y));
-      cr.x = Math.max(0, Math.min(cr.x, src.w - cr.w));
-      cr.y = Math.max(0, Math.min(cr.y, src.h - cr.h));
+      cr.w = Math.max(10, cr.w);
+      cr.h = Math.max(10, cr.h);
     }
   },
 
@@ -487,30 +514,18 @@ App.canvasExport = {
     var cr = state.cropRect;
 
     if (ds.zone === 'interior') {
-      var src0 = App.canvasExport._getSourceDimensions();
       cr.x = Math.round(o.x + dx);
       cr.y = Math.round(o.y + dy);
-      if (state.canvasMode === 'icon') {
-        // Keep at least 10px of the frame overlapping the image; out-of-bounds fills with bg
-        cr.x = Math.max(-cr.w + 10, Math.min(cr.x, src0.w - 10));
-        cr.y = Math.max(-cr.h + 10, Math.min(cr.y, src0.h - 10));
-      } else {
-        App.canvasExport._clampCropRect();
-      }
+      // No clamping — infinite canvas: the frame can be dragged anywhere
 
     } else if (ds.zone.indexOf('corner-') === 0) {
       // Icon mode: resize the 1:1 square; opposite corner is the anchor.
       // Frame may extend beyond image bounds — out-of-bounds areas fill with bg color on export.
       var corner = ds.zone;
-      var src1 = App.canvasExport._getSourceDimensions();
       var anchorX = (corner === 'corner-tl' || corner === 'corner-bl') ? o.x + o.w : o.x;
       var anchorY = (corner === 'corner-tl' || corner === 'corner-tr') ? o.y + o.h : o.y;
-      // Max size: the larger source dimension (prevents absurdly huge frames)
-      var maxSize = Math.max(10, Math.max(src1.w, src1.h));
-      var newSize = Math.min(
-        Math.max(10, Math.max(Math.abs(sp.x - anchorX), Math.abs(sp.y - anchorY))),
-        maxSize
-      );
+      // No maxSize cap — infinite canvas allows any frame size
+      var newSize = Math.max(10, Math.max(Math.abs(sp.x - anchorX), Math.abs(sp.y - anchorY)));
       cr.w = Math.round(newSize);
       cr.h = Math.round(newSize);
       cr.x = Math.round((corner === 'corner-tl' || corner === 'corner-bl') ? anchorX - newSize : anchorX);
@@ -664,9 +679,8 @@ App.canvasExport = {
   exportIcon: function() {
     var state = App.state;
     var base = App.canvasExport._baseName();
-    var iconPad = state.iconPadding !== undefined ? state.iconPadding : 0.1;
-    var PAD = Math.round(512 * iconPad);
-    var CONTENT = 512 - 2 * PAD;
+    var PAD = 0;
+    var CONTENT = 512;
     var cr = state.cropRect;
     if (!cr) return;
 
@@ -674,11 +688,10 @@ App.canvasExport = {
       // Crop the SVG viewBox to the selected region, then expand outward for padding
       var svgEl = App.canvasExport._parseSVGString();
       var vb = App.canvasExport._parseSVGViewBox(svgEl);
-      // Convert crop rect (source-pixel space == viewBox space for SVGs) + add padding margin
-      var padSVG = iconPad > 0 ? cr.w * iconPad / (1 - 2 * iconPad) : 0;
-      var newVbX = vb.vbX + cr.x - padSVG;
-      var newVbY = vb.vbY + cr.y - padSVG;
-      var newVbSize = cr.w + 2 * padSVG;
+      // Convert crop rect (source-pixel space == viewBox space for SVGs)
+      var newVbX = vb.vbX + cr.x;
+      var newVbY = vb.vbY + cr.y;
+      var newVbSize = cr.w;
 
       var ns = 'http://www.w3.org/2000/svg';
       var bgRect = document.createElementNS(ns, 'rect');
@@ -771,13 +784,13 @@ App.canvasExport = {
       var vb = App.canvasExport._parseSVGViewBox(svgEl);
 
       // cropRect is in viewBox user-unit space (imgWidth === vbW per loadSVG)
-      // new viewBox = [vbX + cropRect.x, vbY + cropRect.y, cropRect.w, cropRect.h]
       var newVb = (vb.vbX + cr.x) + ' ' + (vb.vbY + cr.y) + ' ' + cr.w + ' ' + cr.h;
       svgEl.setAttribute('viewBox', newVb);
       svgEl.setAttribute('width', outW);
       svgEl.setAttribute('height', outH);
 
-      if (state.canvasAddBg) {
+      var outOfBounds = cr.x < 0 || cr.y < 0 || cr.x + cr.w > vb.vbW || cr.y + cr.h > vb.vbH;
+      if (state.canvasAddBg || outOfBounds) {
         var ns = 'http://www.w3.org/2000/svg';
         var bgRect = document.createElementNS(ns, 'rect');
         bgRect.setAttribute('width', '100%');
@@ -802,26 +815,31 @@ App.canvasExport = {
       var srcCanvas = state._brushedCanvas || state.processedCanvas || state.originalCanvas;
       if (!srcCanvas) return;
 
-      // Clamp scaledCr to actual canvas bounds
-      scaledCr.x = Math.max(0, Math.min(scaledCr.x, srcCanvas.width - 1));
-      scaledCr.y = Math.max(0, Math.min(scaledCr.y, srcCanvas.height - 1));
-      scaledCr.w = Math.max(1, Math.min(scaledCr.w, srcCanvas.width - scaledCr.x));
-      scaledCr.h = Math.max(1, Math.min(scaledCr.h, srcCanvas.height - scaledCr.y));
-
       var outCanvas = document.createElement('canvas');
       outCanvas.width = outW;
       outCanvas.height = outH;
       var ctx = outCanvas.getContext('2d');
 
-      if (state.canvasAddBg) {
+      // Intersection of crop rect with source canvas (handles out-of-bounds frames)
+      var iSX = Math.max(scaledCr.x, 0);
+      var iSY = Math.max(scaledCr.y, 0);
+      var iSX2 = Math.min(scaledCr.x + scaledCr.w, srcCanvas.width);
+      var iSY2 = Math.min(scaledCr.y + scaledCr.h, srcCanvas.height);
+
+      if (state.canvasAddBg || scaledCr.x < 0 || scaledCr.y < 0 || iSX2 > srcCanvas.width || iSY2 > srcCanvas.height) {
         ctx.fillStyle = state.canvasBgColor;
         ctx.fillRect(0, 0, outW, outH);
       }
 
-      ctx.drawImage(srcCanvas,
-        scaledCr.x, scaledCr.y, scaledCr.w, scaledCr.h,
-        0, 0, outW, outH
-      );
+      if (iSX2 > iSX && iSY2 > iSY) {
+        var iSW = iSX2 - iSX;
+        var iSH = iSY2 - iSY;
+        var dX = (iSX - scaledCr.x) / scaledCr.w * outW;
+        var dY = (iSY - scaledCr.y) / scaledCr.h * outH;
+        var dW = iSW / scaledCr.w * outW;
+        var dH = iSH / scaledCr.h * outH;
+        ctx.drawImage(srcCanvas, iSX, iSY, iSW, iSH, dX, dY, dW, dH);
+      }
 
       outCanvas.toBlob(function(blob) {
         App.download.downloadBlob(blob, base + suffix + '.png');

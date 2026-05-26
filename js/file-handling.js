@@ -39,7 +39,6 @@ App.fileHandling = {
     state.canvasBgColor = '#ffffff';
     state.canvasKeepSVG = false;
     state.canvasAddBg = false;
-    state.iconPadding = 0.1;
     if (dom.canvasAddBgToggle) dom.canvasAddBgToggle.checked = false;
     if (dom.canvasKeepSVGToggle) dom.canvasKeepSVGToggle.checked = false;
     if (dom.canvasBgColorInput) dom.canvasBgColorInput.value = '#ffffff';
@@ -189,6 +188,10 @@ App.fileHandling = {
     if (App.app && App.app.updateCanvasPanel) App.app.updateCanvasPanel();
     App.download.updateDownloadInfo();
     App.tutorial.resumeTour();
+    // Defer to give browser time to lay out the editor before computing dimensions
+    requestAnimationFrame(function() {
+      if (App.zoomPan) App.zoomPan.zoomToDefault();
+    });
   },
 
   loadFromURL: function(url) {

@@ -63,10 +63,6 @@ App.app = {
     if (!dom.canvasPanel) return;
     var mode = state.canvasMode;
 
-    // Padding slider + fit button (icon only)
-    if (dom.iconPaddingRow) {
-      dom.iconPaddingRow.style.display = (mode === 'icon') ? '' : 'none';
-    }
     var iconFitRow = App.$('iconFitRow');
     if (iconFitRow) iconFitRow.style.display = (mode === 'icon') ? '' : 'none';
     // Show/hide bg color row
@@ -411,7 +407,10 @@ App.app = {
     var rect = dom.comparison.getBoundingClientRect();
     App.zoomPan.setZoom(state.zoom / App.zoomPan.ZOOM_STEP, rect.left + rect.width / 2, rect.top + rect.height / 2);
   });
-  dom.btnZoomFit.addEventListener('click', function() { App.zoomPan.zoomToFit(); });
+  dom.btnZoomFit.addEventListener('click', function() {
+    if (App.state.canvasMode) App.canvasExport.fitToCanvasFrame();
+    else App.zoomPan.zoomToDefault();
+  });
 
   // Scroll wheel zoom
   dom.comparison.addEventListener('wheel', function(e) {
@@ -515,7 +514,8 @@ App.app = {
       App.zoomPan.setZoom(state.zoom / App.zoomPan.ZOOM_STEP, rect2.left + rect2.width / 2, rect2.top + rect2.height / 2);
     } else if (e.key === '0' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
-      App.zoomPan.zoomToFit();
+      if (App.state.canvasMode) App.canvasExport.fitToCanvasFrame();
+      else App.zoomPan.zoomToDefault();
     }
   });
 
@@ -674,13 +674,7 @@ App.app = {
     });
   }
 
-  if (dom.iconPaddingSlider) {
-    dom.iconPaddingSlider.addEventListener('input', function() {
-      state.iconPadding = dom.iconPaddingSlider.value / 100;
-      if (dom.iconPaddingValue) dom.iconPaddingValue.textContent = dom.iconPaddingSlider.value;
-      App.canvasExport.renderOverlay();
-    });
-  }
+
 
   if (dom.canvasAddBgToggle) {
     dom.canvasAddBgToggle.addEventListener('change', function() {

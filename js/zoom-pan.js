@@ -45,6 +45,28 @@ App.zoomPan = {
     App.zoomPan.applyZoomTransform();
   },
 
+  // Default canvas view: image centered at ~70% of the container so canvas space is visible.
+  zoomToDefault: function() {
+    var state = App.state;
+    var dom = App.dom;
+    if (!state.imgWidth || !state.imgHeight) return;
+    var containerW = dom.comparison.offsetWidth || 1;
+    var containerH = dom.comparison.offsetHeight || 1;
+    var MAX_H = 500;
+    var upScale = (state.upscale && state.fileType !== 'svg') ? (state.upscaleScale || 1) : 1;
+    var imgScale = Math.min(upScale, containerW / state.imgWidth, MAX_H / state.imgHeight);
+    var renderedW = state.imgWidth * imgScale;
+    var renderedH = state.imgHeight * imgScale;
+    var FILL = 0.70;
+    var Z = Math.min(1.0, FILL * Math.min(containerW / renderedW, containerH / renderedH));
+    Z = Math.max(ZOOM_MIN, Z);
+    // Image center is always at (containerW/2, containerH/2) in content space
+    state.zoom = Z;
+    state.panX = containerW / 2 * (1 - Z);
+    state.panY = containerH / 2 * (1 - Z);
+    App.zoomPan.applyZoomTransform();
+  },
+
   applyZoomTransform: function() {
     var state = App.state;
     var dom = App.dom;
