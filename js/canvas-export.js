@@ -60,7 +60,16 @@ App.canvasExport = {
         h: sqSize
       };
     } else if (type === 'logo') {
-      state.cropRect = { x: 0, y: 0, w: src.w, h: src.h };
+      var ar = src.w / src.h;
+      if (src.w === src.h) {
+        // Square image can't produce a valid logo (AR ≠ 1.0 required); default to 2:1 centered crop
+        var cropH = Math.round(src.h / 2);
+        state.cropRect = { x: 0, y: Math.round((src.h - cropH) / 2), w: src.w, h: cropH };
+        ar = 2.0;
+      } else {
+        state.cropRect = { x: 0, y: 0, w: src.w, h: src.h };
+      }
+      state._logoOrigAR = ar;
     } else if (type === 'header') {
       // 3:1 centred crop, clamped to source
       var cW = Math.min(src.w, src.h * 3);
@@ -88,6 +97,7 @@ App.canvasExport = {
     if (type === 'icon') App.canvasExport._refreshPreviewImg();
     App.canvasExport.renderOverlay();
     App.canvasExport.fitToCanvasFrame();
+    App.download.updateDownloadInfo();
   },
 
   // ── Zoom/pan so the crop frame + image are both fully visible with margin ──
@@ -174,6 +184,7 @@ App.canvasExport = {
 
     state.canvasMode = null;
     state.cropRect = null;
+    state._logoOrigAR = null;
     _previewImg = null;
 
     // Restore hidden comparison chrome and layer clips
@@ -205,11 +216,13 @@ App.canvasExport = {
     if (dom2.btnCanvasHeader) dom2.btnCanvasHeader.classList.remove('active');
 
     if (App.app && App.app.updateCanvasPanel) App.app.updateCanvasPanel();
+    App.download.updateDownloadInfo();
   },
 
   // ── Image transform: maps source-pixel coords → overlay-canvas coords ──
-  // Images render with max-width:100%, max-height:500px — images never upscale beyond
-  // their natural size (only downscale to fit). The min(1,...) enforces that cap.
+  // Images render with max-width:100%, max-height:500px. Rasters never upscale beyond
+  // their natural size. SVGs without explicit width/height attributes scale up to fill
+  // the container via CSS, so we measure the actual DOM img element instead of capping at 1.
   // The container may be taller than the image (min-height:200px CSS floor), so we cannot
   // use containerW/src.w and containerH/src.h independently — they diverge for short images.
   _getImageTransform: function() {
@@ -219,17 +232,44 @@ App.canvasExport = {
     var containerW = dom.comparisonContent.offsetWidth || 1;
     var containerH = dom.comparisonContent.offsetHeight || 1;
     var MAX_H = 500;
-    // For upscaled rasters the sizer canvas is upscaleScale× larger, so the effective
-    // rendered size (before hitting the max constraints) is src × upscaleScale.
-    // SVGs are never raster-upscaled by the current pipeline, so upScale stays 1 for them.
-    var upScale = (state.upscale && state.fileType !== 'svg') ? (state.upscaleScale || 1) : 1;
-    var scale = Math.min(upScale, containerW / src.w, MAX_H / src.h);
-    var renderedW = src.w * scale;
-    var renderedH = src.h * scale;
+    var scale, rW, rH;
+
+    if (state.fileType === 'svg') {
+      // SVGs may render at any size depending on whether they have explicit width/height.
+      // Use getBoundingClientRect on the actual img element and reverse the CSS transform
+      // (translate(panX,panY) scale(Z) on comparisonContent) to get layout coordinates.
+      var svgImg = dom.processedLayer.querySelector('img') || dom.originalLayer.querySelector('img');
+      if (svgImg) {
+        var Z   = state.zoom || 1;
+        var pX  = state.panX || 0;
+        var pY  = state.panY || 0;
+        var imgRect  = svgImg.getBoundingClientRect();
+        var compRect = dom.comparison.getBoundingClientRect();
+        if (imgRect.width > 0 && imgRect.height > 0) {
+          // getBoundingClientRect gives visual (post-CSS-transform) dimensions.
+          // Layout = visual / Z; offsetX from: imgRect.left = compRect.left + layoutX*Z + pX
+          scale = (imgRect.width / Z) / src.w;
+          return {
+            scale: scale,
+            offsetX: (imgRect.left - compRect.left - pX) / Z,
+            offsetY: (imgRect.top  - compRect.top  - pY) / Z
+          };
+        }
+      }
+      // Fallback when img not yet rendered: allow scale > 1 (SVGs can upscale)
+      scale = Math.min(containerW / src.w, MAX_H / src.h);
+    } else {
+      // For upscaled rasters the sizer canvas is upscaleScale× larger.
+      var upScale = state.upscale ? (state.upscaleScale || 1) : 1;
+      scale = Math.min(upScale, containerW / src.w, MAX_H / src.h);
+    }
+
+    rW = src.w * scale;
+    rH = src.h * scale;
     return {
       scale: scale,
-      offsetX: (containerW - renderedW) / 2,
-      offsetY: (containerH - renderedH) / 2
+      offsetX: (containerW - rW) / 2,
+      offsetY: (containerH - rH) / 2
     };
   },
 
@@ -362,7 +402,7 @@ App.canvasExport = {
 
       // Label
       var label = state.canvasMode === 'logo'
-        ? 'Logo (×512px tall)'
+        ? 'Logo (' + Math.round(512 * cr.w / cr.h) + ' × 512px)'
         : '1500 × 500 (header)';
       ctx.font = 'bold 12px sans-serif';
       ctx.textAlign = 'center';
@@ -448,21 +488,6 @@ App.canvasExport = {
     return 'interior';
   },
 
-  _snapLogoAR: function(dragAxis) {
-    var cr = App.state.cropRect;
-    if (!cr || cr.h === 0) return;
-    var ar = cr.w / cr.h;
-    if (Math.abs(ar - 1.0) >= 0.1) return; // already non-square, no snap needed
-    if (dragAxis === 'h') {
-      // Vertical drag — adjust height to push away from AR=1
-      // Snap to the smaller height (keeping width, so AR > 1)
-      cr.h = Math.round(cr.w * (ar < 1 ? 0.9 : 1.1));
-    } else {
-      // Horizontal drag — adjust width
-      cr.w = Math.round(cr.h * (ar < 1 ? 0.9 : 1.1));
-    }
-  },
-
   _clampCropRect: function() {
     var cr = App.state.cropRect;
     // Infinite canvas: no position constraints — the frame can be dragged anywhere.
@@ -537,24 +562,26 @@ App.canvasExport = {
       var newW = o.w - (newX - o.x);
       if (newW >= 1) { cr.x = newX; cr.w = newW; }
       App.canvasExport._clampCropRect();
-      if (state.canvasMode === 'logo') App.canvasExport._snapLogoAR('w');
+      if (state.canvasMode === 'logo') cr.h = Math.max(10, Math.round(cr.w / state._logoOrigAR));
+      if (state.canvasMode === 'header') cr.h = Math.max(10, Math.round(cr.w / 3));
 
     } else if (ds.zone === 'right') {
       cr.w = Math.max(1, Math.round(o.w + dx));
       App.canvasExport._clampCropRect();
-      if (state.canvasMode === 'logo') App.canvasExport._snapLogoAR('w');
+      if (state.canvasMode === 'logo') cr.h = Math.max(10, Math.round(cr.w / state._logoOrigAR));
+      if (state.canvasMode === 'header') cr.h = Math.max(10, Math.round(cr.w / 3));
 
     } else if (ds.zone === 'top') {
       var newY = Math.round(o.y + dy);
       var newH = o.h - (newY - o.y);
       if (newH >= 1) { cr.y = newY; cr.h = newH; }
       App.canvasExport._clampCropRect();
-      if (state.canvasMode === 'logo') App.canvasExport._snapLogoAR('h');
+      if (state.canvasMode === 'logo') cr.w = Math.max(10, Math.round(cr.h * state._logoOrigAR));
 
     } else if (ds.zone === 'bottom') {
       cr.h = Math.max(1, Math.round(o.h + dy));
       App.canvasExport._clampCropRect();
-      if (state.canvasMode === 'logo') App.canvasExport._snapLogoAR('h');
+      if (state.canvasMode === 'logo') cr.w = Math.max(10, Math.round(cr.h * state._logoOrigAR));
     }
 
     App.canvasExport.renderOverlay();

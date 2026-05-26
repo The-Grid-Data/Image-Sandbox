@@ -80,6 +80,8 @@ App.zoomPan = {
     if (state.canvasMode || (App.svgEditor && App.svgEditor._inlineSVG)) {
       dom.comparisonHandle.style.display = 'none';
     }
+    // Keep canvas overlay in sync with zoom/pan
+    if (state.canvasMode && App.canvasExport) App.canvasExport.renderOverlay();
   },
 
   pushUndo: function() {

@@ -36,6 +36,7 @@ App.fileHandling = {
     if (App.canvasExport && App.canvasExport.deactivate) App.canvasExport.deactivate();
     state.canvasMode = null;
     state.cropRect = null;
+    state._logoOrigAR = null;
     state.canvasBgColor = '#ffffff';
     state.canvasKeepSVG = false;
     state.canvasAddBg = false;

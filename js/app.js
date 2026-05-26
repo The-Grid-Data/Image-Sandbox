@@ -642,6 +642,7 @@ App.app = {
       [dom.btnCanvasIcon, dom.btnCanvasLogo, dom.btnCanvasHeader].forEach(function(b) {
         if (b) b.classList.remove('active');
       });
+      App.zoomPan.zoomToDefault();
       App.app.updateCanvasPanel();
       return;
     }
@@ -664,6 +665,7 @@ App.app = {
   if (dom.btnCanvasCancel) {
     dom.btnCanvasCancel.addEventListener('click', function() {
       App.canvasExport.deactivate();
+      App.zoomPan.zoomToDefault();
       App.app.updateCanvasPanel();
     });
   }
@@ -687,6 +689,7 @@ App.app = {
   if (dom.canvasKeepSVGToggle) {
     dom.canvasKeepSVGToggle.addEventListener('change', function() {
       state.canvasKeepSVG = dom.canvasKeepSVGToggle.checked;
+      App.download.updateDownloadInfo();
     });
   }
 

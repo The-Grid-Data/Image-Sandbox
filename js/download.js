@@ -6,13 +6,28 @@ App.download = {
     var state = App.state;
     var dom = App.dom;
     if (state.fileType === 'svg') {
-      dom.downloadInfo.textContent = 'SVG \u2022 ' + state.imgWidth + ' x ' + state.imgHeight;
+      if (state.canvasMode && !state.canvasKeepSVG) {
+        // Canvas export will rasterize \u2014 show the PNG output dimensions
+        if (state.canvasMode === 'icon') {
+          dom.downloadInfo.textContent = 'PNG \u2022 512 \u00d7 512';
+        } else if (state.canvasMode === 'logo') {
+          var cr = state.cropRect;
+          var logoW = cr ? Math.round(512 * cr.w / cr.h) : 'auto';
+          dom.downloadInfo.textContent = 'PNG \u2022 ' + logoW + ' \u00d7 512';
+        } else {
+          dom.downloadInfo.textContent = 'PNG \u2022 1500 \u00d7 500';
+        }
+      } else if (state.canvasMode && state.canvasKeepSVG) {
+        dom.downloadInfo.textContent = 'SVG \u2022 cropped';
+      } else {
+        dom.downloadInfo.textContent = 'SVG \u2022 ' + state.imgWidth + ' x ' + state.imgHeight;
+      }
     } else {
       var fmt = state.originalFormat !== 'png' ? '(converted from ' + state.originalFormat.toUpperCase() + ') ' : '';
-      var outW = state.upscale ? state.imgWidth * state.upscaleScale : state.imgWidth;
-      var outH = state.upscale ? state.imgHeight * state.upscaleScale : state.imgHeight;
+      var rW = state.upscale ? state.imgWidth * state.upscaleScale : state.imgWidth;
+      var rH = state.upscale ? state.imgHeight * state.upscaleScale : state.imgHeight;
       var upLabel = state.upscale ? state.upscaleScale + 'x upscaled \u2022 ' : '';
-      dom.downloadInfo.textContent = 'PNG ' + fmt + upLabel + '\u2022 ' + outW + ' x ' + outH + ' \u2022 max quality';
+      dom.downloadInfo.textContent = 'PNG ' + fmt + upLabel + '\u2022 ' + rW + ' x ' + rH + ' \u2022 max quality';
     }
   },
 
