@@ -6,6 +6,7 @@ App.svgEditor = {
   _savedCompareModeDisplay: null,
   _savedSelectiveDisplay: null,
   _originalTransforms: null,  // Map<el, transform|null> snapshot taken at init
+  _docMap: null,              // Map<inlineEl → docEl> so mutations can sync back to state.svgDoc
   _nextGroupId: 1,
 
   // Replace the blob-<img> in originalLayer with an inline <svg> clone so child
@@ -35,6 +36,20 @@ App.svgEditor = {
       snap.set(el, el.getAttribute('transform'));
     });
     App.svgEditor._originalTransforms = snap;
+
+    // Build a parallel map from inline elements to their twins in state.svgDoc.
+    // The inline tree is a deep clone of svgDoc, so a flat document-order walk of
+    // both yields aligned pairs. Used by syncToDoc() to mirror inline edits back.
+    var docRoot = state.svgDoc.documentElement;
+    var inlineAll = clone.querySelectorAll('*');
+    var docAll = docRoot.querySelectorAll('*');
+    var docMap = new Map();
+    docMap.set(clone, docRoot);
+    var pairLen = Math.min(inlineAll.length, docAll.length);
+    for (var pi = 0; pi < pairLen; pi++) {
+      docMap.set(inlineAll[pi], docAll[pi]);
+    }
+    App.svgEditor._docMap = docMap;
 
     // Show the full originalLayer so all SVG elements are clickable; hide processed layer
     dom.originalLayer.style.clipPath = '';
@@ -167,7 +182,7 @@ App.svgEditor = {
     state.svgEditRedoStack = [];
     els.forEach(function(el) {
       var prevTransform = el.getAttribute('transform') || '';
-      state.svgEditHistory.push({ el: el, prevTransform: prevTransform, groupId: groupId });
+      state.svgEditHistory.push({ el: el, kind: 'transform', prevTransform: prevTransform, groupId: groupId });
       var next = 'translate(' + svgDx + ',' + svgDy + ')' + (prevTransform ? ' ' + prevTransform : '');
       el.setAttribute('transform', next);
     });
@@ -188,13 +203,95 @@ App.svgEditor = {
         var cx = bb.x + bb.width / 2;
         var cy = bb.y + bb.height / 2;
         var prevTransform = el.getAttribute('transform') || '';
-        state.svgEditHistory.push({ el: el, prevTransform: prevTransform, groupId: groupId });
+        state.svgEditHistory.push({ el: el, kind: 'transform', prevTransform: prevTransform, groupId: groupId });
         var scaleXf = 'translate(' + cx + ',' + cy + ') scale(' + scale + ') translate(' + (-cx) + ',' + (-cy) + ')';
         var next = scaleXf + (prevTransform ? ' ' + prevTransform : '');
         el.setAttribute('transform', next);
       } catch (_e) {}
     });
     App.svgEditor._redrawAllHighlights();
+  },
+
+  // Paint the current selection with `color`. Sets fill always; also stroke
+  // when the element strokes. Mutations are undoable as one group, OR (when
+  // opts.createUndo === false) merge into the most recent group so a live
+  // colour-picker drag produces a single ⌘Z step.
+  applyColorToSelection: function(color, opts) {
+    var state = App.state;
+    var els = state.selectedSVGEls;
+    if (!els.length) return;
+    var createUndo = !opts || opts.createUndo !== false;
+    if (createUndo) {
+      var groupId = App.svgEditor._newGroupId();
+      state.svgEditRedoStack = [];
+      els.forEach(function(el) {
+        state.svgEditHistory.push({
+          el: el, kind: 'color', groupId: groupId,
+          prevFill: el.getAttribute('fill'),
+          prevStroke: el.getAttribute('stroke')
+        });
+      });
+    }
+    els.forEach(function(el) {
+      el.setAttribute('fill', color);
+      var stroke = el.getAttribute('stroke');
+      if (stroke && stroke !== 'none') {
+        el.setAttribute('stroke', color);
+      }
+    });
+    App.svgEditor._redrawAllHighlights();
+  },
+
+  // Mirror fill / stroke / transform from each inline element back to its twin
+  // in state.svgDoc. Lets downstream consumers (applySVGProcessing, downloadSVG,
+  // extract) see edits made in Edit Elements mode.
+  syncToDoc: function() {
+    var inline = App.svgEditor._inlineSVG;
+    var docMap = App.svgEditor._docMap;
+    if (!inline || !docMap) return;
+    var attrs = ['fill', 'stroke', 'transform'];
+    function mirror(iEl) {
+      var dEl = docMap.get(iEl);
+      if (!dEl) return;
+      attrs.forEach(function(a) {
+        var v = iEl.getAttribute(a);
+        if (v === null) dEl.removeAttribute(a);
+        else dEl.setAttribute(a, v);
+      });
+    }
+    mirror(inline);
+    Array.prototype.forEach.call(inline.querySelectorAll('*'), mirror);
+  },
+
+  // Apply an undo/redo entry's stored "before" state to its element.
+  _applyEntry: function(entry) {
+    var el = entry.el;
+    if (entry.kind === 'color') {
+      if (entry.prevFill === null) el.removeAttribute('fill');
+      else el.setAttribute('fill', entry.prevFill);
+      if (entry.prevStroke === null) el.removeAttribute('stroke');
+      else el.setAttribute('stroke', entry.prevStroke);
+    } else {
+      // 'transform' (default for legacy entries with no kind)
+      if (entry.prevTransform) el.setAttribute('transform', entry.prevTransform);
+      else el.removeAttribute('transform');
+    }
+  },
+
+  // Snapshot an element's current state into a new entry of the given kind,
+  // so it can be pushed onto the opposite stack during undo/redo.
+  _captureCurrent: function(el, kind, groupId) {
+    if (kind === 'color') {
+      return {
+        el: el, kind: 'color', groupId: groupId,
+        prevFill: el.getAttribute('fill'),
+        prevStroke: el.getAttribute('stroke')
+      };
+    }
+    return {
+      el: el, kind: 'transform', groupId: groupId,
+      prevTransform: el.getAttribute('transform') || ''
+    };
   },
 
   // Extract selected element(s) as one standalone SVG, preserving referenced defs.
@@ -318,24 +415,18 @@ App.svgEditor = {
     App.download.downloadBlob(blob, baseName + suffix + '.svg');
   },
 
-  // Undo the last group of SVG element transforms. Entries sharing a groupId
-  // revert together so a single ⌘Z undoes a multi-element move/resize.
+  // Undo the last group of SVG element edits. Entries sharing a groupId revert
+  // together so a single ⌘Z reverses a multi-element transform or paint batch.
   undoEdit: function() {
     var state = App.state;
     if (!state.svgEditHistory.length) return false;
-    var top = state.svgEditHistory[state.svgEditHistory.length - 1];
-    var groupId = top.groupId;
+    var groupId = state.svgEditHistory[state.svgEditHistory.length - 1].groupId;
     while (state.svgEditHistory.length) {
       var t = state.svgEditHistory[state.svgEditHistory.length - 1];
       if (t.groupId !== groupId) break;
       state.svgEditHistory.pop();
-      var curTransform = t.el.getAttribute('transform') || '';
-      state.svgEditRedoStack.push({ el: t.el, prevTransform: curTransform, groupId: groupId });
-      if (t.prevTransform) {
-        t.el.setAttribute('transform', t.prevTransform);
-      } else {
-        t.el.removeAttribute('transform');
-      }
+      state.svgEditRedoStack.push(App.svgEditor._captureCurrent(t.el, t.kind, groupId));
+      App.svgEditor._applyEntry(t);
       if (!groupId) break; // legacy ungrouped entry: revert one
     }
     App.svgEditor._redrawAllHighlights();
@@ -346,19 +437,13 @@ App.svgEditor = {
   redoEdit: function() {
     var state = App.state;
     if (!state.svgEditRedoStack.length) return false;
-    var top = state.svgEditRedoStack[state.svgEditRedoStack.length - 1];
-    var groupId = top.groupId;
+    var groupId = state.svgEditRedoStack[state.svgEditRedoStack.length - 1].groupId;
     while (state.svgEditRedoStack.length) {
       var t = state.svgEditRedoStack[state.svgEditRedoStack.length - 1];
       if (t.groupId !== groupId) break;
       state.svgEditRedoStack.pop();
-      var curTransform = t.el.getAttribute('transform') || '';
-      state.svgEditHistory.push({ el: t.el, prevTransform: curTransform, groupId: groupId });
-      if (t.prevTransform) {
-        t.el.setAttribute('transform', t.prevTransform);
-      } else {
-        t.el.removeAttribute('transform');
-      }
+      state.svgEditHistory.push(App.svgEditor._captureCurrent(t.el, t.kind, groupId));
+      App.svgEditor._applyEntry(t);
       if (!groupId) break;
     }
     App.svgEditor._redrawAllHighlights();
@@ -386,7 +471,11 @@ App.svgEditor = {
     var state = App.state;
     var dom = App.dom;
     App.svgEditor._clearHighlights();
+    // Mirror inline edits back to state.svgDoc before tearing down, so the
+    // processed layer and any subsequent download include them.
+    App.svgEditor.syncToDoc();
     App.svgEditor._inlineSVG = null;
+    App.svgEditor._docMap = null;
     state.selectedSVGEls = [];
     state.svgEditHistory = [];
     state.svgEditRedoStack = [];
@@ -411,6 +500,9 @@ App.svgEditor = {
 
     if (state.fileType === 'svg') {
       App.colorReplacement.renderOriginalSVG();
+      // Refresh processed layer so element edits surface on the right side of
+      // the comparison slider when the user toggles Edit Elements off.
+      App.colorReplacement.applySVGProcessing();
     }
   },
 };

@@ -35,6 +35,13 @@ App.download = {
     var state = App.state;
     if (state.canvasMode === 'icon') { App.canvasExport.exportIcon(); return; }
     if (state.canvasMode === 'logo' || state.canvasMode === 'header') { App.canvasExport.exportCrop(); return; }
+    // If the inline SVG editor is active, mirror element edits (transforms,
+    // recolours) back to state.svgDoc and refresh _processedSVG so the
+    // download includes them.
+    if (App.svgEditor && App.svgEditor._inlineSVG) {
+      App.svgEditor.syncToDoc();
+      App.colorReplacement.applySVGProcessing();
+    }
     var svgStr = state._processedSVG || state.svgSource;
     var blob = new Blob([svgStr], { type: 'image/svg+xml' });
     App.download.downloadBlob(blob, state.fileName.replace(/\.svg$/i, '') + '_modified.svg');

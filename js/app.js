@@ -136,7 +136,23 @@ App.app = {
     applyProcessing();
   }
 
+  // True when the inline SVG editor is active AND has at least one selection;
+  // in that case, presets and the target colour picker paint the selected
+  // elements directly instead of running the global colour-replacement flow.
+  function isSelectionPaintMode() {
+    return !!(App.svgEditor && App.svgEditor._inlineSVG &&
+              state.selectedSVGEls && state.selectedSVGEls.length);
+  }
+
   dom.presetWhite.addEventListener('click', function() {
+    if (isSelectionPaintMode()) {
+      App.svgEditor.applyColorToSelection('#ffffff');
+      dom.targetColorRow.style.display = '';
+      dom.targetColorInput.value = '#ffffff';
+      dom.targetHexInput.value = '#ffffff';
+      state.targetColor = '#ffffff';
+      return;
+    }
     if (state.presetMode === 'white') { deactivatePreset(); return; }
     App.colorDetection.pushColorUndo();
     clearPresetButtons();
@@ -163,6 +179,14 @@ App.app = {
   });
 
   dom.presetBlack.addEventListener('click', function() {
+    if (isSelectionPaintMode()) {
+      App.svgEditor.applyColorToSelection('#000000');
+      dom.targetColorRow.style.display = '';
+      dom.targetColorInput.value = '#000000';
+      dom.targetHexInput.value = '#000000';
+      state.targetColor = '#000000';
+      return;
+    }
     if (state.presetMode === 'black') { deactivatePreset(); return; }
     App.colorDetection.pushColorUndo();
     clearPresetButtons();
@@ -190,6 +214,13 @@ App.app = {
   });
 
   dom.presetCustom.addEventListener('click', function() {
+    if (isSelectionPaintMode()) {
+      // Reveal the picker row and open the OS colour picker so the user can
+      // drive selection paint via the live input handler below.
+      dom.targetColorRow.style.display = '';
+      try { dom.targetColorInput.click(); } catch (_e) {}
+      return;
+    }
     if (state.presetMode === 'custom') { deactivatePreset(); return; }
     App.colorDetection.pushColorUndo();
     clearPresetButtons();
@@ -205,21 +236,34 @@ App.app = {
 
   // ── Target color events ──
   var _colorInputUndoPushed = false;
+  // Tracks whether the current colour-picker drag has already pushed its
+  // single grouped undo entry for selection paint, so live `input` events
+  // don't create one entry per pixel of drag.
+  var _selectionPaintUndoPushed = false;
   dom.targetColorInput.addEventListener('mousedown', function() {
     // Push undo once when user starts picking a new color
     if (!_colorInputUndoPushed) {
       App.colorDetection.pushColorUndo();
       _colorInputUndoPushed = true;
     }
+    _selectionPaintUndoPushed = false;
   });
   dom.targetColorInput.addEventListener('change', function() {
     _colorInputUndoPushed = false; // Reset after picker closes
+    _selectionPaintUndoPushed = false;
     App.colorDetection.renderSwatches();
     App.colorDetection.updateSummary();
   });
   dom.targetColorInput.addEventListener('input', function() {
-    state.targetColor = dom.targetColorInput.value;
-    dom.targetHexInput.value = dom.targetColorInput.value;
+    var color = dom.targetColorInput.value;
+    state.targetColor = color;
+    dom.targetHexInput.value = color;
+    if (isSelectionPaintMode()) {
+      var createUndo = !_selectionPaintUndoPushed;
+      _selectionPaintUndoPushed = true;
+      App.svgEditor.applyColorToSelection(color, { createUndo: createUndo });
+      return;
+    }
     if (state.selectedSourceColor) state.colorReplacements[state.selectedSourceColor] = state.targetColor;
     applyProcessing();
   });
@@ -228,9 +272,16 @@ App.app = {
     var val = dom.targetHexInput.value.trim();
     if (!val.startsWith('#')) val = '#' + val;
     if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+      var hex = val.toLowerCase();
+      if (isSelectionPaintMode()) {
+        state.targetColor = hex;
+        dom.targetColorInput.value = hex;
+        App.svgEditor.applyColorToSelection(hex);
+        return;
+      }
       App.colorDetection.pushColorUndo();
-      state.targetColor = val.toLowerCase();
-      dom.targetColorInput.value = val;
+      state.targetColor = hex;
+      dom.targetColorInput.value = hex;
       if (state.selectedSourceColor) state.colorReplacements[state.selectedSourceColor] = state.targetColor;
       App.colorDetection.renderSwatches();
       App.colorDetection.updateSummary();
