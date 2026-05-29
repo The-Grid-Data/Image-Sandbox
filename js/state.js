@@ -41,9 +41,9 @@ window.App = {
     panY: 0,
     undoStack: [],      // Array of Float32Array snapshots (brush mask only)
     redoStack: [],
-    svgEditHistory: [],     // Array of {el, prevTransform} for SVG editor undo
+    svgEditHistory: [],     // Array of {el, prevTransform, groupId} for SVG editor undo
     svgEditRedoStack: [],
-    selectedSVGEl: null,
+    selectedSVGEls: [],     // Array of currently-selected SVG element refs
     canvasMode: null,       // 'icon' | 'logo' | 'header' | null
     cropRect: null,         // {x, y, w, h} in source-image-pixel coordinates
     canvasBgColor: '#ffffff',
@@ -156,6 +156,7 @@ window.App = {
   d.svgEditOptions = $('svgEditOptions');
   d.svgEditHint = $('svgEditHint');
   d.svgEditActions = $('svgEditActions');
+  d.svgEditCount = $('svgEditCount');
   d.btnSvgMoveLeft = $('btnSvgMoveLeft');
   d.btnSvgMoveRight = $('btnSvgMoveRight');
   d.btnSvgMoveUp = $('btnSvgMoveUp');

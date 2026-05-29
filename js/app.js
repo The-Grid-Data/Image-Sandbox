@@ -41,8 +41,13 @@ App.app = {
     var state = App.state;
     var dom = App.dom;
     if (!dom.svgEditActions) return;
-    dom.svgEditActions.style.display = state.selectedSVGEl ? '' : 'none';
-    if (dom.svgEditHint) dom.svgEditHint.style.display = state.selectedSVGEl ? 'none' : '';
+    var n = state.selectedSVGEls ? state.selectedSVGEls.length : 0;
+    dom.svgEditActions.style.display = n ? '' : 'none';
+    if (dom.svgEditHint) dom.svgEditHint.style.display = n ? 'none' : '';
+    if (dom.svgEditCount) {
+      dom.svgEditCount.style.display = n > 1 ? '' : 'none';
+      dom.svgEditCount.textContent = n + ' elements selected';
+    }
   },
 
   // Show a one-time hint when the user sets a non-white canvas bg on an opaque raster image

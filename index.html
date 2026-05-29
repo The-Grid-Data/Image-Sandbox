@@ -145,11 +145,12 @@
           <input type="checkbox" id="svgEditToggle">
           <span class="toggle-slider"></span>
         </label>
-        <label for="svgEditToggle" title="Click an SVG element in the preview to select it, then move, resize or extract it">Edit elements</label>
+        <label for="svgEditToggle" title="Click an SVG element in the preview to select it; shift-click to add to selection. Then move, resize or extract.">Edit elements</label>
       </div>
       <div class="svg-edit-options" id="svgEditOptions">
-        <div class="svg-edit-hint" id="svgEditHint">Click an element in the preview to select it</div>
+        <div class="svg-edit-hint" id="svgEditHint">Click to select. Shift-click to add/remove.</div>
         <div class="svg-edit-actions" id="svgEditActions" style="display:none;">
+          <div class="svg-edit-count" id="svgEditCount" style="display:none;font-size:11px;color:#94a3b8;margin-bottom:6px;">0 elements selected</div>
           <div class="svg-edit-move-row">
             <span class="toolbar-label">Move:</span>
             <button class="btn-svg-edit" id="btnSvgMoveLeft" title="Move selected element left">&#9664;</button>
@@ -393,7 +394,7 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- JS modules (defer = execute in order after HTML parsing) -->
-<script src="js/state.js?v=23" defer></script>
+<script src="js/state.js?v=24" defer></script>
 <script src="js/utils.js?v=23" defer></script>
 <script src="js/comparison.js?v=23" defer></script>
 <script src="js/zoom-pan.js?v=23" defer></script>
@@ -404,8 +405,8 @@
 <script src="js/file-handling.js?v=23" defer></script>
 <script src="js/download.js?v=23" defer></script>
 <script src="js/canvas-export.js?v=23" defer></script>
-<script src="js/svg-editor.js?v=23" defer></script>
+<script src="js/svg-editor.js?v=24" defer></script>
 <script src="js/tutorial.js?v=23" defer></script>
-<script src="js/app.js?v=23" defer></script>
+<script src="js/app.js?v=24" defer></script>
 </body>
 </html>
