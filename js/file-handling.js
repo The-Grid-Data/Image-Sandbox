@@ -115,6 +115,12 @@ App.fileHandling = {
       // treat those elements as foreign XHTML and skip rendering them entirely.
       // Only the root <svg xmlns="http://www.w3.org/2000/svg"> needs xmlns.
       state.svgSource = state.svgSource.replace(/\s+xmlns="(?!http:\/\/www\.w3\.org\/2000\/svg)[^"]*"/g, '');
+      // Normalize `currentColor` to black before parsing. It's a CSS keyword that
+      // resolves to the inherited `color` property at render time — black by default
+      // in a standalone <img>. Without this, SVGs exported with `fill="currentColor"`
+      // (common from React/Tailwind) produce zero detected colors and the Make
+      // White/Black presets become no-ops.
+      state.svgSource = state.svgSource.replace(/\bcurrentColor\b/gi, '#000000');
       var parser = new DOMParser();
       state.svgDoc = parser.parseFromString(state.svgSource, 'image/svg+xml');
 
